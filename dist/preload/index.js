@@ -19,6 +19,13 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   createQuiz: (data) => electron.ipcRenderer.invoke("db:createQuiz", data),
   deleteQuiz: (id) => electron.ipcRenderer.invoke("db:deleteQuiz", id),
   getStatistics: () => electron.ipcRenderer.invoke("db:getStatistics"),
+  // Events
+  getEvents: () => electron.ipcRenderer.invoke("db:getEvents"),
+  getUpcomingEvents: (daysAhead) => electron.ipcRenderer.invoke("db:getUpcomingEvents", daysAhead),
+  getEventsBySubject: (subjectId) => electron.ipcRenderer.invoke("db:getEventsBySubject", subjectId),
+  createEvent: (subjectId, title, eventType, eventDate, description) => electron.ipcRenderer.invoke("db:createEvent", subjectId, title, eventType, eventDate, description),
+  updateEvent: (id, title, eventType, eventDate, description) => electron.ipcRenderer.invoke("db:updateEvent", id, title, eventType, eventDate, description),
+  deleteEvent: (id) => electron.ipcRenderer.invoke("db:deleteEvent", id),
   // File operations
   selectFile: () => electron.ipcRenderer.invoke("file:selectFile"),
   // AI operations

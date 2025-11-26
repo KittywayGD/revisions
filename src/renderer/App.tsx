@@ -5,6 +5,7 @@ import Library from './pages/Library';
 import Generate from './pages/Generate';
 import Review from './pages/Review';
 import QuizPage from './pages/QuizPage';
+import Calendar from './pages/Calendar';
 import Statistics from './pages/Statistics';
 import Settings from './pages/Settings';
 import type { NavigationPage, Theme } from '../shared/types';
@@ -41,6 +42,8 @@ function App() {
         return <Review />;
       case 'quiz':
         return <QuizPage />;
+      case 'calendar':
+        return <Calendar />;
       case 'statistics':
         return <Statistics />;
       case 'settings':

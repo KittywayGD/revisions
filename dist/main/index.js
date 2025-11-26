@@ -78,11 +78,24 @@ class DatabaseService {
         FOREIGN KEY (flashcard_id) REFERENCES flashcards (id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        event_type TEXT NOT NULL CHECK(event_type IN ('test', 'kholle', 'exam', 'other')),
+        event_date TEXT NOT NULL,
+        description TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
+      );
+
       CREATE INDEX IF NOT EXISTS idx_chapters_subject ON chapters(subject_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_chapter ON flashcards(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_next_review ON flashcards(next_review_date);
       CREATE INDEX IF NOT EXISTS idx_quizzes_chapter ON quizzes(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_review_history_flashcard ON review_history(flashcard_id);
+      CREATE INDEX IF NOT EXISTS idx_events_subject ON events(subject_id);
+      CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
     `);
     this.runMigrations();
   }
@@ -165,17 +178,80 @@ class DatabaseService {
     }
   }
   getFlashcardsDueForReview() {
-    const now = (/* @__PURE__ */ new Date()).toISOString();
-    return this.db.prepare(
+    const now = /* @__PURE__ */ new Date();
+    const nowISO = now.toISOString();
+    const upcomingEvents = this.getUpcomingEvents(14);
+    const eventPriorityMap = /* @__PURE__ */ new Map();
+    upcomingEvents.forEach((event) => {
+      const eventDate = new Date(event.event_date);
+      const daysUntil = Math.ceil((eventDate.getTime() - now.getTime()) / (1e3 * 60 * 60 * 24));
+      if (!eventPriorityMap.has(event.subject_id) || daysUntil < eventPriorityMap.get(event.subject_id)) {
+        eventPriorityMap.set(event.subject_id, daysUntil);
+      }
+    });
+    if (eventPriorityMap.size === 0) {
+      return this.db.prepare(
+        `
+        SELECT f.*, c.name as chapter_name, s.name as subject_name, s.id as subject_id
+        FROM flashcards f
+        JOIN chapters c ON f.chapter_id = c.id
+        JOIN subjects s ON c.subject_id = s.id
+        WHERE f.next_review_date <= ?
+        ORDER BY f.next_review_date ASC
       `
-      SELECT f.*, c.name as chapter_name, s.name as subject_name
+      ).all(nowISO);
+    }
+    const dueCards = this.db.prepare(
+      `
+      SELECT f.*, c.name as chapter_name, s.name as subject_name, s.id as subject_id
       FROM flashcards f
       JOIN chapters c ON f.chapter_id = c.id
       JOIN subjects s ON c.subject_id = s.id
       WHERE f.next_review_date <= ?
-      ORDER BY f.next_review_date ASC
     `
-    ).all(now);
+    ).all(nowISO);
+    const prioritySubjectIds = Array.from(eventPriorityMap.keys());
+    const extraCards = this.db.prepare(
+      `
+      SELECT f.*, c.name as chapter_name, s.name as subject_name, s.id as subject_id
+      FROM flashcards f
+      JOIN chapters c ON f.chapter_id = c.id
+      JOIN subjects s ON c.subject_id = s.id
+      WHERE s.id IN (${prioritySubjectIds.map(() => "?").join(",")})
+        AND f.next_review_date > ?
+        AND f.next_review_date <= date('now', '+7 days')
+      ORDER BY f.review_count ASC, f.next_review_date ASC
+      LIMIT 10
+    `
+    ).all(...prioritySubjectIds, nowISO);
+    const allCards = [...dueCards, ...extraCards];
+    const uniqueCards = Array.from(
+      new Map(allCards.map((card) => [card.id, card])).values()
+    );
+    const cardsWithPriority = uniqueCards.map((card) => {
+      let priorityBoost = 1;
+      const daysUntil = eventPriorityMap.get(card.subject_id);
+      if (daysUntil !== void 0) {
+        if (daysUntil <= 3) {
+          priorityBoost = 3;
+        } else if (daysUntil <= 7) {
+          priorityBoost = 2;
+        } else if (daysUntil <= 14) {
+          priorityBoost = 1.5;
+        }
+      }
+      return {
+        ...card,
+        priorityBoost,
+        daysUntilEvent: daysUntil
+      };
+    });
+    return cardsWithPriority.sort((a, b) => {
+      if (b.priorityBoost !== a.priorityBoost) {
+        return b.priorityBoost - a.priorityBoost;
+      }
+      return new Date(a.next_review_date).getTime() - new Date(b.next_review_date).getTime();
+    });
   }
   // Quizzes
   getQuizzesByChapter(chapterId) {
@@ -294,6 +370,61 @@ class DatabaseService {
   }
   updateChapter(id, name, content) {
     this.db.prepare("UPDATE chapters SET name = ?, content = ? WHERE id = ?").run(name, content, id);
+  }
+  // Events
+  getEvents() {
+    return this.db.prepare(
+      `
+      SELECT
+        e.*,
+        s.name as subject_name,
+        s.color as subject_color
+      FROM events e
+      JOIN subjects s ON e.subject_id = s.id
+      ORDER BY e.event_date ASC
+    `
+    ).all();
+  }
+  getUpcomingEvents(daysAhead = 30) {
+    return this.db.prepare(
+      `
+      SELECT
+        e.*,
+        s.name as subject_name,
+        s.color as subject_color
+      FROM events e
+      JOIN subjects s ON e.subject_id = s.id
+      WHERE e.event_date >= date('now')
+        AND e.event_date <= date('now', '+' || ? || ' days')
+      ORDER BY e.event_date ASC
+    `
+    ).all(daysAhead);
+  }
+  getEventsBySubject(subjectId) {
+    return this.db.prepare(
+      `
+      SELECT
+        e.*,
+        s.name as subject_name,
+        s.color as subject_color
+      FROM events e
+      JOIN subjects s ON e.subject_id = s.id
+      WHERE e.subject_id = ?
+      ORDER BY e.event_date ASC
+    `
+    ).all(subjectId);
+  }
+  createEvent(subjectId, title, eventType, eventDate, description) {
+    const result = this.db.prepare(
+      "INSERT INTO events (subject_id, title, event_type, event_date, description) VALUES (?, ?, ?, ?, ?)"
+    ).run(subjectId, title, eventType, eventDate, description || null);
+    return this.db.prepare("SELECT * FROM events WHERE id = ?").get(result.lastInsertRowid);
+  }
+  updateEvent(id, title, eventType, eventDate, description) {
+    this.db.prepare("UPDATE events SET title = ?, event_type = ?, event_date = ?, description = ? WHERE id = ?").run(title, eventType, eventDate, description || null, id);
+  }
+  deleteEvent(id) {
+    this.db.prepare("DELETE FROM events WHERE id = ?").run(id);
   }
   close() {
     this.db.close();
@@ -667,6 +798,24 @@ ipcMain.handle("db:deleteQuiz", async (_, id) => {
 });
 ipcMain.handle("db:getStatistics", async () => {
   return dbService.getStatistics();
+});
+ipcMain.handle("db:getEvents", async () => {
+  return dbService.getEvents();
+});
+ipcMain.handle("db:getUpcomingEvents", async (_, daysAhead) => {
+  return dbService.getUpcomingEvents(daysAhead);
+});
+ipcMain.handle("db:getEventsBySubject", async (_, subjectId) => {
+  return dbService.getEventsBySubject(subjectId);
+});
+ipcMain.handle("db:createEvent", async (_, subjectId, title, eventType, eventDate, description) => {
+  return dbService.createEvent(subjectId, title, eventType, eventDate, description);
+});
+ipcMain.handle("db:updateEvent", async (_, id, title, eventType, eventDate, description) => {
+  return dbService.updateEvent(id, title, eventType, eventDate, description);
+});
+ipcMain.handle("db:deleteEvent", async (_, id) => {
+  return dbService.deleteEvent(id);
 });
 ipcMain.handle("file:selectFile", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {

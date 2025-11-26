@@ -152,6 +152,31 @@ ipcMain.handle('db:getStatistics', async () => {
   return dbService.getStatistics();
 });
 
+// Events
+ipcMain.handle('db:getEvents', async () => {
+  return dbService.getEvents();
+});
+
+ipcMain.handle('db:getUpcomingEvents', async (_, daysAhead: number) => {
+  return dbService.getUpcomingEvents(daysAhead);
+});
+
+ipcMain.handle('db:getEventsBySubject', async (_, subjectId: number) => {
+  return dbService.getEventsBySubject(subjectId);
+});
+
+ipcMain.handle('db:createEvent', async (_, subjectId: number, title: string, eventType: string, eventDate: string, description?: string) => {
+  return dbService.createEvent(subjectId, title, eventType, eventDate, description);
+});
+
+ipcMain.handle('db:updateEvent', async (_, id: number, title: string, eventType: string, eventDate: string, description?: string) => {
+  return dbService.updateEvent(id, title, eventType, eventDate, description);
+});
+
+ipcMain.handle('db:deleteEvent', async (_, id: number) => {
+  return dbService.deleteEvent(id);
+});
+
 // File operations
 ipcMain.handle('file:selectFile', async () => {
   const result = await dialog.showOpenDialog(mainWindow!, {

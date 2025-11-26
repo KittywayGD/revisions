@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { AcademicCapIcon, BookOpenIcon, ChartBarIcon, FireIcon } from '@heroicons/react/24/outline';
-import type { Subject, Statistics } from '../../shared/types';
+import { AcademicCapIcon, BookOpenIcon, ChartBarIcon, FireIcon, CalendarIcon, ClockIcon } from '@heroicons/react/24/outline';
+import type { Subject, Statistics, EventWithSubject } from '../../shared/types';
 
 interface DashboardProps {
-  onNavigate: (page: 'library' | 'review' | 'statistics') => void;
+  onNavigate: (page: 'library' | 'review' | 'statistics' | 'calendar') => void;
 }
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [stats, setStats] = useState<Statistics | null>(null);
   const [dueCards, setDueCards] = useState<number>(0);
+  const [upcomingEvents, setUpcomingEvents] = useState<EventWithSubject[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,15 +19,17 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   const loadData = async () => {
     try {
-      const [subjectsData, statsData, dueCardsData] = await Promise.all([
+      const [subjectsData, statsData, dueCardsData, eventsData] = await Promise.all([
         window.electronAPI.getSubjects(),
         window.electronAPI.getStatistics(),
         window.electronAPI.getFlashcardsDueForReview(),
+        window.electronAPI.getUpcomingEvents(14),
       ]);
 
       setSubjects(subjectsData);
       setStats(statsData);
       setDueCards(dueCardsData.length);
+      setUpcomingEvents(eventsData);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -111,6 +114,101 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </div>
       </div>
+
+      {/* Upcoming Events */}
+      {upcomingEvents.length > 0 && (
+        <div className="card mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                Événements à venir
+              </h2>
+            </div>
+            <button
+              onClick={() => onNavigate('calendar')}
+              className="btn btn-secondary text-sm"
+            >
+              Voir calendrier
+            </button>
+          </div>
+          <div className="space-y-3">
+            {upcomingEvents.slice(0, 3).map((event) => {
+              const eventDate = new Date(event.event_date);
+              const today = new Date();
+              const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+              const eventTypeColors = {
+                test: 'bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700',
+                kholle: 'bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border-purple-300 dark:border-purple-700',
+                exam: 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border-red-300 dark:border-red-700',
+                other: 'bg-gray-100 dark:bg-gray-700/20 text-gray-700 dark:text-gray-400 border-gray-300 dark:border-gray-600',
+              };
+
+              const urgencyColor = daysUntil <= 3
+                ? 'text-red-600 dark:text-red-400 font-semibold'
+                : daysUntil <= 7
+                ? 'text-orange-600 dark:text-orange-400 font-medium'
+                : 'text-gray-600 dark:text-gray-300';
+
+              return (
+                <div
+                  key={event.id}
+                  className={`p-4 rounded-lg border-2 ${eventTypeColors[event.event_type]}`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: event.subject_color }}
+                        />
+                        <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                          {event.title}
+                        </h3>
+                      </div>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {event.subject_name}
+                      </p>
+                      {event.description && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                          {event.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className={`flex items-center gap-1 ${urgencyColor}`}>
+                        <ClockIcon className="w-4 h-4" />
+                        <span className="text-sm">
+                          {daysUntil === 0
+                            ? "Aujourd'hui !"
+                            : daysUntil === 1
+                            ? 'Demain'
+                            : `${daysUntil}j`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {eventDate.toLocaleDateString('fr-FR', {
+                          day: 'numeric',
+                          month: 'short',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {upcomingEvents.length > 3 && (
+              <button
+                onClick={() => onNavigate('calendar')}
+                className="w-full text-center py-2 text-sm text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-lg transition-colors"
+              >
+                Voir {upcomingEvents.length - 3} événement{upcomingEvents.length - 3 > 1 ? 's' : ''} de plus
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Start review button */}
       {dueCards > 0 && (

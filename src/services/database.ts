@@ -1,7 +1,7 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
-import type { Subject, Chapter, Flashcard, Quiz, ReviewHistory, Statistics } from '../shared/types.js';
+import type { Subject, Chapter, Flashcard, Quiz, ReviewHistory, Statistics, Event, EventWithSubject } from '../shared/types.js';
 
 export class DatabaseService {
   private db: Database.Database;
@@ -71,11 +71,24 @@ export class DatabaseService {
         FOREIGN KEY (flashcard_id) REFERENCES flashcards (id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        event_type TEXT NOT NULL CHECK(event_type IN ('test', 'kholle', 'exam', 'other')),
+        event_date TEXT NOT NULL,
+        description TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
+      );
+
       CREATE INDEX IF NOT EXISTS idx_chapters_subject ON chapters(subject_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_chapter ON flashcards(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_next_review ON flashcards(next_review_date);
       CREATE INDEX IF NOT EXISTS idx_quizzes_chapter ON quizzes(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_review_history_flashcard ON review_history(flashcard_id);
+      CREATE INDEX IF NOT EXISTS idx_events_subject ON events(subject_id);
+      CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
     `);
     
     // Run migrations for existing databases
@@ -199,19 +212,106 @@ export class DatabaseService {
   }
 
   getFlashcardsDueForReview(): any[] {
-    const now = new Date().toISOString();
-    return this.db
+    const now = new Date();
+    const nowISO = now.toISOString();
+
+    // Récupérer les événements à venir dans les 14 prochains jours
+    const upcomingEvents = this.getUpcomingEvents(14);
+
+    // Créer un map de subject_id -> jours avant événement
+    const eventPriorityMap = new Map<number, number>();
+    upcomingEvents.forEach((event) => {
+      const eventDate = new Date(event.event_date);
+      const daysUntil = Math.ceil((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Garder seulement l'événement le plus proche pour chaque matière
+      if (!eventPriorityMap.has(event.subject_id) || daysUntil < eventPriorityMap.get(event.subject_id)!) {
+        eventPriorityMap.set(event.subject_id, daysUntil);
+      }
+    });
+
+    // Si pas d'événements proches, utiliser l'ancien algorithme
+    if (eventPriorityMap.size === 0) {
+      return this.db
+        .prepare(
+          `
+        SELECT f.*, c.name as chapter_name, s.name as subject_name, s.id as subject_id
+        FROM flashcards f
+        JOIN chapters c ON f.chapter_id = c.id
+        JOIN subjects s ON c.subject_id = s.id
+        WHERE f.next_review_date <= ?
+        ORDER BY f.next_review_date ASC
+      `
+        )
+        .all(nowISO);
+    }
+
+    // Récupérer les flashcards dues normalement
+    const dueCards = this.db
       .prepare(
         `
-      SELECT f.*, c.name as chapter_name, s.name as subject_name
+      SELECT f.*, c.name as chapter_name, s.name as subject_name, s.id as subject_id
       FROM flashcards f
       JOIN chapters c ON f.chapter_id = c.id
       JOIN subjects s ON c.subject_id = s.id
       WHERE f.next_review_date <= ?
-      ORDER BY f.next_review_date ASC
     `
       )
-      .all(now);
+      .all(nowISO);
+
+    // Pour les matières avec événements proches, ajouter des flashcards supplémentaires
+    const prioritySubjectIds = Array.from(eventPriorityMap.keys());
+    const extraCards = this.db
+      .prepare(
+        `
+      SELECT f.*, c.name as chapter_name, s.name as subject_name, s.id as subject_id
+      FROM flashcards f
+      JOIN chapters c ON f.chapter_id = c.id
+      JOIN subjects s ON c.subject_id = s.id
+      WHERE s.id IN (${prioritySubjectIds.map(() => '?').join(',')})
+        AND f.next_review_date > ?
+        AND f.next_review_date <= date('now', '+7 days')
+      ORDER BY f.review_count ASC, f.next_review_date ASC
+      LIMIT 10
+    `
+      )
+      .all(...prioritySubjectIds, nowISO);
+
+    // Combiner et dédupliquer
+    const allCards = [...dueCards, ...extraCards];
+    const uniqueCards = Array.from(
+      new Map(allCards.map((card) => [card.id, card])).values()
+    );
+
+    // Calculer le score de priorité et trier
+    const cardsWithPriority = uniqueCards.map((card) => {
+      let priorityBoost = 1;
+      const daysUntil = eventPriorityMap.get(card.subject_id);
+
+      if (daysUntil !== undefined) {
+        if (daysUntil <= 3) {
+          priorityBoost = 3; // Événement très proche
+        } else if (daysUntil <= 7) {
+          priorityBoost = 2; // Événement proche
+        } else if (daysUntil <= 14) {
+          priorityBoost = 1.5; // Événement moyennement proche
+        }
+      }
+
+      return {
+        ...card,
+        priorityBoost,
+        daysUntilEvent: daysUntil,
+      };
+    });
+
+    // Trier par priorité (boost élevé d'abord), puis par date de révision
+    return cardsWithPriority.sort((a, b) => {
+      if (b.priorityBoost !== a.priorityBoost) {
+        return b.priorityBoost - a.priorityBoost;
+      }
+      return new Date(a.next_review_date).getTime() - new Date(b.next_review_date).getTime();
+    });
   }
 
   // Quizzes
@@ -381,6 +481,89 @@ export class DatabaseService {
 
   updateChapter(id: number, name: string, content: string): void {
     this.db.prepare('UPDATE chapters SET name = ?, content = ? WHERE id = ?').run(name, content, id);
+  }
+
+  // Events
+  getEvents(): EventWithSubject[] {
+    return this.db
+      .prepare(
+        `
+      SELECT
+        e.*,
+        s.name as subject_name,
+        s.color as subject_color
+      FROM events e
+      JOIN subjects s ON e.subject_id = s.id
+      ORDER BY e.event_date ASC
+    `
+      )
+      .all() as EventWithSubject[];
+  }
+
+  getUpcomingEvents(daysAhead: number = 30): EventWithSubject[] {
+    return this.db
+      .prepare(
+        `
+      SELECT
+        e.*,
+        s.name as subject_name,
+        s.color as subject_color
+      FROM events e
+      JOIN subjects s ON e.subject_id = s.id
+      WHERE e.event_date >= date('now')
+        AND e.event_date <= date('now', '+' || ? || ' days')
+      ORDER BY e.event_date ASC
+    `
+      )
+      .all(daysAhead) as EventWithSubject[];
+  }
+
+  getEventsBySubject(subjectId: number): EventWithSubject[] {
+    return this.db
+      .prepare(
+        `
+      SELECT
+        e.*,
+        s.name as subject_name,
+        s.color as subject_color
+      FROM events e
+      JOIN subjects s ON e.subject_id = s.id
+      WHERE e.subject_id = ?
+      ORDER BY e.event_date ASC
+    `
+      )
+      .all(subjectId) as EventWithSubject[];
+  }
+
+  createEvent(
+    subjectId: number,
+    title: string,
+    eventType: string,
+    eventDate: string,
+    description?: string
+  ): Event {
+    const result = this.db
+      .prepare(
+        'INSERT INTO events (subject_id, title, event_type, event_date, description) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(subjectId, title, eventType, eventDate, description || null);
+    return this.db.prepare('SELECT * FROM events WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  updateEvent(
+    id: number,
+    title: string,
+    eventType: string,
+    eventDate: string,
+    description?: string
+  ): void {
+    this.db
+      .prepare('UPDATE events SET title = ?, event_type = ?, event_date = ?, description = ? WHERE id = ?')
+      .run(title, eventType, eventDate, description || null, id);
+  }
+
+  deleteEvent(id: number): void {
+    this.db.prepare('DELETE FROM events WHERE id = ?').run(id);
   }
 
   close() {

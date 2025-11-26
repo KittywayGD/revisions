@@ -24,6 +24,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteQuiz: (id: number) => ipcRenderer.invoke('db:deleteQuiz', id),
   getStatistics: () => ipcRenderer.invoke('db:getStatistics'),
 
+  // Events
+  getEvents: () => ipcRenderer.invoke('db:getEvents'),
+  getUpcomingEvents: (daysAhead: number) => ipcRenderer.invoke('db:getUpcomingEvents', daysAhead),
+  getEventsBySubject: (subjectId: number) => ipcRenderer.invoke('db:getEventsBySubject', subjectId),
+  createEvent: (subjectId: number, title: string, eventType: string, eventDate: string, description?: string) =>
+    ipcRenderer.invoke('db:createEvent', subjectId, title, eventType, eventDate, description),
+  updateEvent: (id: number, title: string, eventType: string, eventDate: string, description?: string) =>
+    ipcRenderer.invoke('db:updateEvent', id, title, eventType, eventDate, description),
+  deleteEvent: (id: number) => ipcRenderer.invoke('db:deleteEvent', id),
+
   // File operations
   selectFile: () => ipcRenderer.invoke('file:selectFile'),
 

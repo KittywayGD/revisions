@@ -18,6 +18,14 @@ export interface ElectronAPI {
   deleteQuiz: (id: number) => Promise<void>;
   getStatistics: () => Promise<any>;
 
+  // Events
+  getEvents: () => Promise<any[]>;
+  getUpcomingEvents: (daysAhead: number) => Promise<any[]>;
+  getEventsBySubject: (subjectId: number) => Promise<any[]>;
+  createEvent: (subjectId: number, title: string, eventType: string, eventDate: string, description?: string) => Promise<any>;
+  updateEvent: (id: number, title: string, eventType: string, eventDate: string, description?: string) => Promise<void>;
+  deleteEvent: (id: number) => Promise<void>;
+
   // File operations
   selectFile: () => Promise<{
     path: string;

@@ -49,6 +49,16 @@ export interface ReviewHistory {
   success: boolean;
 }
 
+export interface Event {
+  id: number;
+  subject_id: number;
+  title: string;
+  event_type: 'test' | 'kholle' | 'exam' | 'other';
+  event_date: string;
+  description?: string;
+  created_at: string;
+}
+
 // Extended types with relations
 export interface ChapterWithSubject extends Chapter {
   subject_name: string;
@@ -58,6 +68,11 @@ export interface ChapterWithSubject extends Chapter {
 export interface FlashcardWithChapter extends Flashcard {
   chapter_name: string;
   subject_name: string;
+}
+
+export interface EventWithSubject extends Event {
+  subject_name: string;
+  subject_color: string;
 }
 
 // API types
@@ -137,4 +152,4 @@ export interface ImportedFile {
 export type Theme = 'light' | 'dark';
 
 // Navigation
-export type NavigationPage = 'dashboard' | 'library' | 'generate' | 'review' | 'quiz' | 'statistics';
+export type NavigationPage = 'dashboard' | 'library' | 'generate' | 'review' | 'quiz' | 'statistics' | 'calendar';
