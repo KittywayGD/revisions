@@ -1,0 +1,28 @@
+"use strict";
+const electron = require("electron");
+electron.contextBridge.exposeInMainWorld("electronAPI", {
+  // Database
+  getSubjects: () => electron.ipcRenderer.invoke("db:getSubjects"),
+  createSubject: (name, color) => electron.ipcRenderer.invoke("db:createSubject", name, color),
+  getChaptersBySubject: (subjectId) => electron.ipcRenderer.invoke("db:getChaptersBySubject", subjectId),
+  createChapter: (subjectId, name, content, filePath) => electron.ipcRenderer.invoke("db:createChapter", subjectId, name, content, filePath),
+  getFlashcardsByChapter: (chapterId) => electron.ipcRenderer.invoke("db:getFlashcardsByChapter", chapterId),
+  createFlashcard: (data) => electron.ipcRenderer.invoke("db:createFlashcard", data),
+  updateFlashcard: (id, data) => electron.ipcRenderer.invoke("db:updateFlashcard", id, data),
+  getFlashcardsDueForReview: () => electron.ipcRenderer.invoke("db:getFlashcardsDueForReview"),
+  recordReview: (flashcardId, rating, success) => electron.ipcRenderer.invoke("db:recordReview", flashcardId, rating, success),
+  getQuizzesByChapter: (chapterId) => electron.ipcRenderer.invoke("db:getQuizzesByChapter", chapterId),
+  createQuiz: (data) => electron.ipcRenderer.invoke("db:createQuiz", data),
+  getStatistics: () => electron.ipcRenderer.invoke("db:getStatistics"),
+  // File operations
+  selectFile: () => electron.ipcRenderer.invoke("file:selectFile"),
+  // AI operations
+  generateFlashcards: (content, count, chapterTitle) => electron.ipcRenderer.invoke("ai:generateFlashcards", content, count, chapterTitle),
+  generateQuizzes: (content, count, chapterTitle) => electron.ipcRenderer.invoke("ai:generateQuizzes", content, count, chapterTitle),
+  // Settings
+  getApiKey: () => electron.ipcRenderer.invoke("settings:getApiKey"),
+  setApiKey: (apiKey) => electron.ipcRenderer.invoke("settings:setApiKey", apiKey),
+  // Theme
+  getTheme: () => electron.ipcRenderer.invoke("theme:get"),
+  setTheme: (theme) => electron.ipcRenderer.invoke("theme:set", theme)
+});

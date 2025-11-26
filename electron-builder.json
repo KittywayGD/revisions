@@ -1,0 +1,27 @@
+{
+  "appId": "com.psi-revision.app",
+  "productName": "PSI Révision",
+  "directories": {
+    "output": "release",
+    "buildResources": "public"
+  },
+  "files": [
+    "dist/**/*",
+    "node_modules/**/*",
+    "package.json"
+  ],
+  "asarUnpack": [
+    "dist/main/pdf-worker.cjs"
+  ],
+  "mac": {
+    "category": "public.app-category.education",
+    "target": ["dmg", "zip"]
+  },
+  "win": {
+    "target": ["nsis", "portable"]
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "category": "Education"
+  }
+}
