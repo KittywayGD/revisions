@@ -38,9 +38,13 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.0",
     "@heroicons/react": "^2.2.0",
+    "@types/katex": "^0.16.7",
     "better-sqlite3": "^12.4.1",
+    "katex": "^0.16.25",
     "pdf-parse": "^1.1.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-katex": "^3.1.0",
+    "recharts": "^3.5.0"
   }
 }

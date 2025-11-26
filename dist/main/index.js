@@ -49,6 +49,7 @@ class DatabaseService {
         easiness_factor REAL DEFAULT 2.5,
         interval INTEGER DEFAULT 1,
         repetitions INTEGER DEFAULT 0,
+        chart_data TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (chapter_id) REFERENCES chapters (id) ON DELETE CASCADE
       );
@@ -63,6 +64,7 @@ class DatabaseService {
         option_d TEXT NOT NULL,
         correct_option TEXT NOT NULL CHECK(correct_option IN ('a', 'b', 'c', 'd')),
         explanation TEXT NOT NULL,
+        chart_data TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (chapter_id) REFERENCES chapters (id) ON DELETE CASCADE
       );
@@ -82,6 +84,21 @@ class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_quizzes_chapter ON quizzes(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_review_history_flashcard ON review_history(flashcard_id);
     `);
+    this.runMigrations();
+  }
+  runMigrations() {
+    const flashcardsColumns = this.db.prepare("PRAGMA table_info(flashcards)").all();
+    const hasChartDataInFlashcards = flashcardsColumns.some((col) => col.name === "chart_data");
+    if (!hasChartDataInFlashcards) {
+      this.db.exec("ALTER TABLE flashcards ADD COLUMN chart_data TEXT");
+      console.log("✅ Migration: Added chart_data column to flashcards");
+    }
+    const quizzesColumns = this.db.prepare("PRAGMA table_info(quizzes)").all();
+    const hasChartDataInQuizzes = quizzesColumns.some((col) => col.name === "chart_data");
+    if (!hasChartDataInQuizzes) {
+      this.db.exec("ALTER TABLE quizzes ADD COLUMN chart_data TEXT");
+      console.log("✅ Migration: Added chart_data column to quizzes");
+    }
   }
   // Subjects
   getSubjects() {
@@ -269,6 +286,15 @@ class DatabaseService {
       reviewsByDay
     };
   }
+  deleteFlashcard(id) {
+    this.db.prepare("DELETE FROM flashcards WHERE id = ?").run(id);
+  }
+  deleteQuiz(id) {
+    this.db.prepare("DELETE FROM quizzes WHERE id = ?").run(id);
+  }
+  updateChapter(id, name, content) {
+    this.db.prepare("UPDATE chapters SET name = ?, content = ? WHERE id = ?").run(name, content, id);
+  }
   close() {
     this.db.close();
   }
@@ -346,15 +372,27 @@ Consignes :
 - IMPORTANT : Réponds avec un **JSON valide strict**.
 - N'utilise PAS de sauts de ligne réels (touches Entrée) à l'intérieur des chaînes de caractères (questions/réponses). Utilise "\\n" pour les retours à la ligne.
 - N'ajoute aucun texte avant ou après le JSON.
+- Tu peux utiliser LaTeX pour les formules mathématiques (syntaxe : $formule$ pour inline, $$formule$$ pour display).
+- Si pertinent (graphiques, courbes, données numériques), tu peux ajouter un champ "chart_data" avec un objet JSON contenant les données d'un graphique.
 
 Format JSON attendu :
 [
   {
     "question": "Question...",
     "answer": "Réponse...",
-    "difficulty": "easy|medium|hard"
+    "difficulty": "easy|medium|hard",
+    "chart_data": {
+      "type": "line|bar|area|scatter|pie",
+      "title": "Titre du graphique (optionnel)",
+      "data": [{"x": 0, "y": 10}, {"x": 1, "y": 20}],
+      "xKey": "x",
+      "yKeys": ["y"],
+      "colors": ["#3B82F6"]
+    }
   }
-]`;
+]
+
+Note : Le champ "chart_data" est optionnel. Ne l'ajoute que si cela apporte une vraie valeur pédagogique (ex: courbes de fonctions, diagrammes, évolution temporelle, etc.).`;
     try {
       const message = await this.callWithRetry(() => this.client.messages.create({
         model: "claude-3-haiku-20240307",
@@ -384,6 +422,8 @@ Consignes :
 - IMPORTANT : Réponds avec un **JSON valide strict**.
 - N'utilise PAS de sauts de ligne réels à l'intérieur des textes. Utilise "\\n" pour les retours à la ligne.
 - "correct" est l'index (0-3) de la bonne réponse.
+- Tu peux utiliser LaTeX pour les formules mathématiques (syntaxe : $formule$ pour inline, $$formule$$ pour display).
+- Si pertinent (graphiques, courbes, données numériques), tu peux ajouter un champ "chart_data" avec un objet JSON contenant les données d'un graphique.
 
 Format JSON attendu :
 [
@@ -391,9 +431,19 @@ Format JSON attendu :
     "question": "...",
     "options": ["A", "B", "C", "D"],
     "correct": 0,
-    "explanation": "..."
+    "explanation": "...",
+    "chart_data": {
+      "type": "line|bar|area|scatter|pie",
+      "title": "Titre du graphique (optionnel)",
+      "data": [{"x": 0, "y": 10}, {"x": 1, "y": 20}],
+      "xKey": "x",
+      "yKeys": ["y"],
+      "colors": ["#3B82F6"]
+    }
   }
-]`;
+]
+
+Note : Le champ "chart_data" est optionnel. Ne l'ajoute que si cela apporte une vraie valeur pédagogique (ex: courbes de fonctions, diagrammes, analyse de données, etc.).`;
     try {
       const message = await this.callWithRetry(() => this.client.messages.create({
         model: "claude-3-haiku-20240307",
@@ -573,17 +623,29 @@ ipcMain.handle("db:getSubjects", async () => {
 ipcMain.handle("db:createSubject", async (_, name, color) => {
   return dbService.createSubject(name, color);
 });
+ipcMain.handle("db:deleteSubject", async (_, id) => {
+  return dbService.deleteSubject(id);
+});
 ipcMain.handle("db:getChaptersBySubject", async (_, subjectId) => {
   return dbService.getChaptersBySubject(subjectId);
 });
 ipcMain.handle("db:createChapter", async (_, subjectId, name, content, filePath) => {
   return dbService.createChapter(subjectId, name, content, filePath);
 });
+ipcMain.handle("db:deleteChapter", async (_, id) => {
+  return dbService.deleteChapter(id);
+});
+ipcMain.handle("db:updateChapter", async (_, id, name, content) => {
+  return dbService.updateChapter(id, name, content);
+});
 ipcMain.handle("db:getFlashcardsByChapter", async (_, chapterId) => {
   return dbService.getFlashcardsByChapter(chapterId);
 });
 ipcMain.handle("db:createFlashcard", async (_, data) => {
   return dbService.createFlashcard(data);
+});
+ipcMain.handle("db:deleteFlashcard", async (_, id) => {
+  return dbService.deleteFlashcard(id);
 });
 ipcMain.handle("db:updateFlashcard", async (_, id, data) => {
   return dbService.updateFlashcard(id, data);
@@ -599,6 +661,9 @@ ipcMain.handle("db:getQuizzesByChapter", async (_, chapterId) => {
 });
 ipcMain.handle("db:createQuiz", async (_, data) => {
   return dbService.createQuiz(data);
+});
+ipcMain.handle("db:deleteQuiz", async (_, id) => {
+  return dbService.deleteQuiz(id);
 });
 ipcMain.handle("db:getStatistics", async () => {
   return dbService.getStatistics();

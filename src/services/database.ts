@@ -42,6 +42,7 @@ export class DatabaseService {
         easiness_factor REAL DEFAULT 2.5,
         interval INTEGER DEFAULT 1,
         repetitions INTEGER DEFAULT 0,
+        chart_data TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (chapter_id) REFERENCES chapters (id) ON DELETE CASCADE
       );
@@ -56,6 +57,7 @@ export class DatabaseService {
         option_d TEXT NOT NULL,
         correct_option TEXT NOT NULL CHECK(correct_option IN ('a', 'b', 'c', 'd')),
         explanation TEXT NOT NULL,
+        chart_data TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (chapter_id) REFERENCES chapters (id) ON DELETE CASCADE
       );
@@ -75,6 +77,27 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_quizzes_chapter ON quizzes(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_review_history_flashcard ON review_history(flashcard_id);
     `);
+    
+    // Run migrations for existing databases
+    this.runMigrations();
+  }
+
+  private runMigrations() {
+    // Migration: Add chart_data column to flashcards if it doesn't exist
+    const flashcardsColumns = this.db.prepare("PRAGMA table_info(flashcards)").all() as any[];
+    const hasChartDataInFlashcards = flashcardsColumns.some(col => col.name === 'chart_data');
+    if (!hasChartDataInFlashcards) {
+      this.db.exec('ALTER TABLE flashcards ADD COLUMN chart_data TEXT');
+      console.log('✅ Migration: Added chart_data column to flashcards');
+    }
+
+    // Migration: Add chart_data column to quizzes if it doesn't exist
+    const quizzesColumns = this.db.prepare("PRAGMA table_info(quizzes)").all() as any[];
+    const hasChartDataInQuizzes = quizzesColumns.some(col => col.name === 'chart_data');
+    if (!hasChartDataInQuizzes) {
+      this.db.exec('ALTER TABLE quizzes ADD COLUMN chart_data TEXT');
+      console.log('✅ Migration: Added chart_data column to quizzes');
+    }
   }
 
   // Subjects
@@ -346,6 +369,18 @@ export class DatabaseService {
       reviewsBySubject: reviewsBySubject as any[],
       reviewsByDay: reviewsByDay as any[],
     };
+  }
+
+  deleteFlashcard(id: number): void {
+    this.db.prepare('DELETE FROM flashcards WHERE id = ?').run(id);
+  }
+
+  deleteQuiz(id: number): void {
+    this.db.prepare('DELETE FROM quizzes WHERE id = ?').run(id);
+  }
+
+  updateChapter(id: number, name: string, content: string): void {
+    this.db.prepare('UPDATE chapters SET name = ?, content = ? WHERE id = ?').run(name, content, id);
   }
 
   close() {

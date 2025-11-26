@@ -6,17 +6,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Database
   getSubjects: () => ipcRenderer.invoke('db:getSubjects'),
   createSubject: (name: string, color: string) => ipcRenderer.invoke('db:createSubject', name, color),
+  deleteSubject: (id: number) => ipcRenderer.invoke('db:deleteSubject', id),
   getChaptersBySubject: (subjectId: number) => ipcRenderer.invoke('db:getChaptersBySubject', subjectId),
   createChapter: (subjectId: number, name: string, content: string, filePath: string | null) =>
     ipcRenderer.invoke('db:createChapter', subjectId, name, content, filePath),
+  deleteChapter: (id: number) => ipcRenderer.invoke('db:deleteChapter', id),
+  updateChapter: (id: number, name: string, content: string) => ipcRenderer.invoke('db:updateChapter', id, name, content),
   getFlashcardsByChapter: (chapterId: number) => ipcRenderer.invoke('db:getFlashcardsByChapter', chapterId),
   createFlashcard: (data: any) => ipcRenderer.invoke('db:createFlashcard', data),
+  deleteFlashcard: (id: number) => ipcRenderer.invoke('db:deleteFlashcard', id),
   updateFlashcard: (id: number, data: any) => ipcRenderer.invoke('db:updateFlashcard', id, data),
   getFlashcardsDueForReview: () => ipcRenderer.invoke('db:getFlashcardsDueForReview'),
   recordReview: (flashcardId: number, rating: string, success: boolean) =>
     ipcRenderer.invoke('db:recordReview', flashcardId, rating, success),
   getQuizzesByChapter: (chapterId: number) => ipcRenderer.invoke('db:getQuizzesByChapter', chapterId),
   createQuiz: (data: any) => ipcRenderer.invoke('db:createQuiz', data),
+  deleteQuiz: (id: number) => ipcRenderer.invoke('db:deleteQuiz', id),
   getStatistics: () => ipcRenderer.invoke('db:getStatistics'),
 
   // File operations

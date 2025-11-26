@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ArrowPathIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import LaTeXRenderer from '../components/LaTeXRenderer';
+import ChartRenderer, { type ChartData } from '../components/ChartRenderer';
 
 export default function Review() {
   const [flashcards, setFlashcards] = useState<any[]>([]);
@@ -108,6 +110,16 @@ export default function Review() {
 
   const currentCard = flashcards[currentIndex];
   const progress = ((currentIndex + 1) / flashcards.length) * 100;
+  
+  // Parse chart data if available
+  let chartData: ChartData | null = null;
+  if (currentCard.chart_data) {
+    try {
+      chartData = JSON.parse(currentCard.chart_data);
+    } catch (error) {
+      console.error('Error parsing chart data:', error);
+    }
+  }
 
   return (
     <div className="p-8 max-w-4xl mx-auto animate-fade-in">
@@ -141,18 +153,25 @@ export default function Review() {
         <div className="flip-card-inner relative">
           <div className="flip-card-front card min-h-[400px] flex flex-col items-center justify-center p-8">
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">QUESTION</p>
-            <p className="text-2xl text-center text-gray-900 dark:text-gray-100">
-              {currentCard.question}
-            </p>
+            <LaTeXRenderer 
+              content={currentCard.question}
+              className="text-2xl text-center text-gray-900 dark:text-gray-100"
+            />
+            {chartData && (
+              <div className="w-full mt-4">
+                <ChartRenderer chart={chartData} />
+              </div>
+            )}
             <p className="text-sm text-gray-400 dark:text-gray-500 mt-8">
               Cliquez pour voir la réponse
             </p>
           </div>
           <div className="flip-card-back card min-h-[400px] flex flex-col items-center justify-center p-8 absolute inset-0">
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">RÉPONSE</p>
-            <p className="text-xl text-center text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
-              {currentCard.answer}
-            </p>
+            <LaTeXRenderer 
+              content={currentCard.answer}
+              className="text-xl text-center text-gray-900 dark:text-gray-100 whitespace-pre-wrap"
+            />
           </div>
         </div>
       </div>

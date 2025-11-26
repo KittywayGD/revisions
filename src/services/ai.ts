@@ -103,15 +103,27 @@ Consignes :
 - IMPORTANT : Réponds avec un **JSON valide strict**.
 - N'utilise PAS de sauts de ligne réels (touches Entrée) à l'intérieur des chaînes de caractères (questions/réponses). Utilise "\\n" pour les retours à la ligne.
 - N'ajoute aucun texte avant ou après le JSON.
+- Tu peux utiliser LaTeX pour les formules mathématiques (syntaxe : $formule$ pour inline, $$formule$$ pour display).
+- Si pertinent (graphiques, courbes, données numériques), tu peux ajouter un champ "chart_data" avec un objet JSON contenant les données d'un graphique.
 
 Format JSON attendu :
 [
   {
     "question": "Question...",
     "answer": "Réponse...",
-    "difficulty": "easy|medium|hard"
+    "difficulty": "easy|medium|hard",
+    "chart_data": {
+      "type": "line|bar|area|scatter|pie",
+      "title": "Titre du graphique (optionnel)",
+      "data": [{"x": 0, "y": 10}, {"x": 1, "y": 20}],
+      "xKey": "x",
+      "yKeys": ["y"],
+      "colors": ["#3B82F6"]
+    }
   }
-]`;
+]
+
+Note : Le champ "chart_data" est optionnel. Ne l'ajoute que si cela apporte une vraie valeur pédagogique (ex: courbes de fonctions, diagrammes, évolution temporelle, etc.).`;
 
     try {
       const message = await this.callWithRetry(() => this.client!.messages.create({
@@ -147,6 +159,8 @@ Consignes :
 - IMPORTANT : Réponds avec un **JSON valide strict**.
 - N'utilise PAS de sauts de ligne réels à l'intérieur des textes. Utilise "\\n" pour les retours à la ligne.
 - "correct" est l'index (0-3) de la bonne réponse.
+- Tu peux utiliser LaTeX pour les formules mathématiques (syntaxe : $formule$ pour inline, $$formule$$ pour display).
+- Si pertinent (graphiques, courbes, données numériques), tu peux ajouter un champ "chart_data" avec un objet JSON contenant les données d'un graphique.
 
 Format JSON attendu :
 [
@@ -154,9 +168,19 @@ Format JSON attendu :
     "question": "...",
     "options": ["A", "B", "C", "D"],
     "correct": 0,
-    "explanation": "..."
+    "explanation": "...",
+    "chart_data": {
+      "type": "line|bar|area|scatter|pie",
+      "title": "Titre du graphique (optionnel)",
+      "data": [{"x": 0, "y": 10}, {"x": 1, "y": 20}],
+      "xKey": "x",
+      "yKeys": ["y"],
+      "colors": ["#3B82F6"]
+    }
   }
-]`;
+]
+
+Note : Le champ "chart_data" est optionnel. Ne l'ajoute que si cela apporte une vraie valeur pédagogique (ex: courbes de fonctions, diagrammes, analyse de données, etc.).`;
 
     try {
       const message = await this.callWithRetry(() => this.client!.messages.create({

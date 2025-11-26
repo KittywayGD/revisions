@@ -24,6 +24,7 @@ export interface Flashcard {
   next_review_date: string;
   review_count: number;
   created_at: string;
+  chart_data?: string; // JSON string containing ChartData
 }
 
 export interface Quiz {
@@ -37,6 +38,7 @@ export interface Quiz {
   correct_option: 'a' | 'b' | 'c' | 'd';
   explanation: string;
   created_at: string;
+  chart_data?: string; // JSON string containing ChartData
 }
 
 export interface ReviewHistory {

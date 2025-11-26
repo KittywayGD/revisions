@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import type { Subject, Chapter, Quiz } from '../../shared/types';
+import LaTeXRenderer from '../components/LaTeXRenderer';
+import ChartRenderer, { type ChartData } from '../components/ChartRenderer';
 
 export default function QuizPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -172,6 +174,16 @@ export default function QuizPage() {
     { key: 'c', value: currentQuiz.option_c },
     { key: 'd', value: currentQuiz.option_d },
   ];
+  
+  // Parse chart data if available
+  let chartData: ChartData | null = null;
+  if (currentQuiz.chart_data) {
+    try {
+      chartData = JSON.parse(currentQuiz.chart_data);
+    } catch (error) {
+      console.error('Error parsing chart data:', error);
+    }
+  }
 
   return (
     <div className="p-8 max-w-4xl mx-auto animate-fade-in">
@@ -191,7 +203,16 @@ export default function QuizPage() {
       </div>
 
       <div className="card mb-6">
-        <p className="text-xl text-gray-900 dark:text-gray-100 mb-8">{currentQuiz.question}</p>
+        <LaTeXRenderer 
+          content={currentQuiz.question}
+          className="text-xl text-gray-900 dark:text-gray-100 mb-8"
+        />
+        
+        {chartData && (
+          <div className="mb-6">
+            <ChartRenderer chart={chartData} />
+          </div>
+        )}
 
         <div className="space-y-3">
           {options.map((option) => {
@@ -219,7 +240,7 @@ export default function QuizPage() {
                   <span className="font-bold text-gray-500 dark:text-gray-400">
                     {option.key.toUpperCase()}.
                   </span>
-                  <span className="flex-1">{option.value}</span>
+                  <LaTeXRenderer content={option.value} className="flex-1" />
                   {showCorrect && <CheckCircleIcon className="w-6 h-6 text-green-500" />}
                   {showIncorrect && <XCircleIcon className="w-6 h-6 text-red-500" />}
                 </div>
@@ -233,7 +254,10 @@ export default function QuizPage() {
             <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
               Explication :
             </p>
-            <p className="text-blue-800 dark:text-blue-200">{currentQuiz.explanation}</p>
+            <LaTeXRenderer 
+              content={currentQuiz.explanation}
+              className="text-blue-800 dark:text-blue-200"
+            />
           </div>
         )}
       </div>

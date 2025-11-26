@@ -92,6 +92,10 @@ ipcMain.handle('db:createSubject', async (_, name: string, color: string) => {
   return dbService.createSubject(name, color);
 });
 
+ipcMain.handle('db:deleteSubject', async (_, id: number) => {
+  return dbService.deleteSubject(id);
+});
+
 ipcMain.handle('db:getChaptersBySubject', async (_, subjectId: number) => {
   return dbService.getChaptersBySubject(subjectId);
 });
@@ -100,12 +104,24 @@ ipcMain.handle('db:createChapter', async (_, subjectId: number, name: string, co
   return dbService.createChapter(subjectId, name, content, filePath);
 });
 
+ipcMain.handle('db:deleteChapter', async (_, id: number) => {
+  return dbService.deleteChapter(id);
+});
+
+ipcMain.handle('db:updateChapter', async (_, id: number, name: string, content: string) => {
+  return dbService.updateChapter(id, name, content);
+});
+
 ipcMain.handle('db:getFlashcardsByChapter', async (_, chapterId: number) => {
   return dbService.getFlashcardsByChapter(chapterId);
 });
 
 ipcMain.handle('db:createFlashcard', async (_, data: any) => {
   return dbService.createFlashcard(data);
+});
+
+ipcMain.handle('db:deleteFlashcard', async (_, id: number) => {
+  return dbService.deleteFlashcard(id);
 });
 
 ipcMain.handle('db:updateFlashcard', async (_, id: number, data: any) => {
@@ -126,6 +142,10 @@ ipcMain.handle('db:getQuizzesByChapter', async (_, chapterId: number) => {
 
 ipcMain.handle('db:createQuiz', async (_, data: any) => {
   return dbService.createQuiz(data);
+});
+
+ipcMain.handle('db:deleteQuiz', async (_, id: number) => {
+  return dbService.deleteQuiz(id);
 });
 
 ipcMain.handle('db:getStatistics', async () => {

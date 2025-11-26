@@ -5,6 +5,8 @@ import {
   DocumentTextIcon,
   TrashIcon,
   SparklesIcon,
+  ChevronRightIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import type { Subject, Chapter } from '../../shared/types';
 
@@ -18,6 +20,7 @@ export default function Library({ onNavigate }: LibraryProps) {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [showNewSubjectModal, setShowNewSubjectModal] = useState(false);
   const [showNewChapterModal, setShowNewChapterModal] = useState(false);
+  const [selectedChapter, setSelectedChapter] = useState<Chapter | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -100,21 +103,45 @@ export default function Library({ onNavigate }: LibraryProps) {
 
         <div className="space-y-1">
           {subjects.map((subject) => (
-            <button
+            <div
               key={subject.id}
-              onClick={() => setSelectedSubject(subject.id)}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${
+              className={`flex items-center gap-2 group ${
                 selectedSubject === subject.id
-                  ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                  ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 rounded-lg'
+                  : ''
               }`}
             >
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: subject.color }}
-              />
-              <span className="font-medium text-sm">{subject.name}</span>
-            </button>
+              <button
+                onClick={() => setSelectedSubject(subject.id)}
+                className="flex-1 flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: subject.color }}
+                />
+                <span className="font-medium text-sm">{subject.name}</span>
+              </button>
+              <button
+                onClick={async () => {
+                  if (confirm(`Êtes-vous sûr de vouloir supprimer "${subject.name}" et tous ses chapitres ?`)) {
+                    try {
+                      await window.electronAPI.deleteSubject(subject.id);
+                      if (selectedSubject === subject.id) {
+                        setSelectedSubject(null);
+                      }
+                      loadSubjects();
+                    } catch (error) {
+                      console.error('Error deleting subject:', error);
+                      alert('Erreur lors de la suppression');
+                    }
+                  }
+                }}
+                className="p-2 opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg transition-all"
+                title="Supprimer la matière"
+              >
+                <TrashIcon className="w-4 h-4 text-red-600 dark:text-red-400" />
+              </button>
+            </div>
           ))}
         </div>
 
@@ -158,6 +185,20 @@ export default function Library({ onNavigate }: LibraryProps) {
                     key={chapter.id}
                     chapter={chapter}
                     onNavigate={onNavigate}
+                    onViewDetails={() => setSelectedChapter(chapter)}
+                    onDelete={async () => {
+                      if (confirm(`Êtes-vous sûr de vouloir supprimer le chapitre "${chapter.name}" ?`)) {
+                        try {
+                          await window.electronAPI.deleteChapter(chapter.id);
+                          if (selectedSubject) {
+                            loadChapters(selectedSubject);
+                          }
+                        } catch (error) {
+                          console.error('Error deleting chapter:', error);
+                          alert('Erreur lors de la suppression');
+                        }
+                      }
+                    }}
                   />
                 ))}
               </div>
@@ -185,15 +226,39 @@ export default function Library({ onNavigate }: LibraryProps) {
           }}
         />
       )}
+
+      {selectedChapter && (
+        <ChapterDetailsModal
+          chapter={selectedChapter}
+          onClose={() => setSelectedChapter(null)}
+        />
+      )}
     </div>
   );
 }
 
-function ChapterCard({ chapter, onNavigate }: { chapter: Chapter; onNavigate: (page: 'generate') => void }) {
+function ChapterCard({
+  chapter,
+  onNavigate,
+  onViewDetails,
+  onDelete
+}: {
+  chapter: Chapter;
+  onNavigate: (page: 'generate') => void;
+  onViewDetails: () => void;
+  onDelete: () => void;
+}) {
   return (
-    <div className="card hover:shadow-md transition-shadow">
+    <div className="card hover:shadow-md transition-shadow group">
       <div className="flex items-start justify-between mb-3">
         <DocumentTextIcon className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+        <button
+          onClick={onDelete}
+          className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/20 rounded-lg transition-all"
+          title="Supprimer le chapitre"
+        >
+          <TrashIcon className="w-4 h-4 text-red-600 dark:text-red-400" />
+        </button>
       </div>
       <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
         {chapter.name}
@@ -201,13 +266,171 @@ function ChapterCard({ chapter, onNavigate }: { chapter: Chapter; onNavigate: (p
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 line-clamp-2">
         {chapter.content.substring(0, 100)}...
       </p>
-      <button
-        onClick={() => onNavigate('generate')}
-        className="btn btn-primary w-full text-sm"
-      >
-        <SparklesIcon className="w-4 h-4 mr-2" />
-        Générer contenu
-      </button>
+      <div className="space-y-2">
+        <button
+          onClick={() => onNavigate('generate')}
+          className="btn btn-primary w-full text-sm"
+        >
+          <SparklesIcon className="w-4 h-4 mr-2" />
+          Générer contenu
+        </button>
+        <button
+          onClick={onViewDetails}
+          className="btn btn-secondary w-full text-sm"
+        >
+          <ChevronRightIcon className="w-4 h-4 mr-2" />
+          Voir détails
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ChapterDetailsModal({ chapter, onClose }: { chapter: Chapter; onClose: () => void }) {
+  const [flashcards, setFlashcards] = useState<any[]>([]);
+  const [quizzes, setQuizzes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadContent();
+  }, []);
+
+  const loadContent = async () => {
+    try {
+      const [flashcardsData, quizzesData] = await Promise.all([
+        window.electronAPI.getFlashcardsByChapter(chapter.id),
+        window.electronAPI.getQuizzesByChapter(chapter.id),
+      ]);
+      setFlashcards(flashcardsData);
+      setQuizzes(quizzesData);
+    } catch (error) {
+      console.error('Error loading content:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteFlashcard = async (id: number) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer cette flashcard ?')) {
+      try {
+        await window.electronAPI.deleteFlashcard(id);
+        loadContent();
+      } catch (error) {
+        console.error('Error deleting flashcard:', error);
+        alert('Erreur lors de la suppression');
+      }
+    }
+  };
+
+  const handleDeleteQuiz = async (id: number) => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer ce quiz ?')) {
+      try {
+        await window.electronAPI.deleteQuiz(id);
+        loadContent();
+      } catch (error) {
+        console.error('Error deleting quiz:', error);
+        alert('Erreur lors de la suppression');
+      }
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="card max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            {chapter.name}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+          >
+            <XMarkIcon className="w-6 h-6" />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="text-gray-500 dark:text-gray-400">Chargement...</div>
+          </div>
+        ) : (
+          <div className="overflow-y-auto space-y-6">
+            {/* Flashcards Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Flashcards ({flashcards.length})
+              </h3>
+              {flashcards.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Aucune flashcard générée pour ce chapitre
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {flashcards.map((flashcard) => (
+                    <div
+                      key={flashcard.id}
+                      className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                          {flashcard.question}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {flashcard.answer}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteFlashcard(flashcard.id)}
+                        className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/20 rounded transition-all flex-shrink-0"
+                        title="Supprimer"
+                      >
+                        <TrashIcon className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Quizzes Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Quiz ({quizzes.length})
+              </h3>
+              {quizzes.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Aucun quiz généré pour ce chapitre
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {quizzes.map((quiz) => (
+                    <div
+                      key={quiz.id}
+                      className="flex items-start gap-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+                          {quiz.question}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Réponse correcte: {quiz.correct_option.toUpperCase()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteQuiz(quiz.id)}
+                        className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/20 rounded transition-all flex-shrink-0"
+                        title="Supprimer"
+                      >
+                        <TrashIcon className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
