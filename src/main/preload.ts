@@ -34,6 +34,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('db:updateEvent', id, title, eventType, eventDate, description),
   deleteEvent: (id: number) => ipcRenderer.invoke('db:deleteEvent', id),
 
+  // Formulas
+  getFormulas: () => ipcRenderer.invoke('db:getFormulas'),
+  getFormulasBySubject: (subjectId: number) => ipcRenderer.invoke('db:getFormulasBySubject', subjectId),
+  getFormulasByTheme: (theme: string) => ipcRenderer.invoke('db:getFormulasByTheme', theme),
+  searchFormulas: (query: string) => ipcRenderer.invoke('db:searchFormulas', query),
+  createFormula: (subjectId: number, theme: string, title: string, formula: string, description?: string, variables?: string, chapterId?: number) =>
+    ipcRenderer.invoke('db:createFormula', subjectId, theme, title, formula, description, variables, chapterId),
+  updateFormula: (id: number, theme: string, title: string, formula: string, description?: string, variables?: string) =>
+    ipcRenderer.invoke('db:updateFormula', id, theme, title, formula, description, variables),
+  deleteFormula: (id: number) => ipcRenderer.invoke('db:deleteFormula', id),
+  getThemesBySubject: (subjectId: number) => ipcRenderer.invoke('db:getThemesBySubject', subjectId),
+
   // File operations
   selectFile: () => ipcRenderer.invoke('file:selectFile'),
 
@@ -42,6 +54,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ai:generateFlashcards', content, count, chapterTitle),
   generateQuizzes: (content: string, count: number, chapterTitle: string) =>
     ipcRenderer.invoke('ai:generateQuizzes', content, count, chapterTitle),
+  generateFormulas: (content: string, chapterTitle: string) =>
+    ipcRenderer.invoke('ai:generateFormulas', content, chapterTitle),
 
   // Settings
   getApiKey: () => ipcRenderer.invoke('settings:getApiKey'),

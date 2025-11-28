@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { FlashcardGenerationResult, QuizGenerationResult } from '../shared/types.js';
+import type { FlashcardGenerationResult, QuizGenerationResult, FormulaGenerationResult } from '../shared/types.js';
 
 export class AIService {
   private client: Anthropic | null = null;
@@ -206,6 +206,59 @@ Note : Le champ "chart_data" est optionnel. Ne l'ajoute que si cela apporte une 
       return quizzes;
     } catch (error) {
       console.error('Error generating quizzes:', error);
+      throw new Error(`Échec de génération : ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    }
+  }
+
+  async generateFormulas(content: string, chapterTitle: string): Promise<FormulaGenerationResult[]> {
+    this.ensureClient();
+
+    const prompt = `À partir du cours suivant sur "${chapterTitle}", extrais TOUTES les formules importantes au format JSON.
+
+Cours :
+${content}
+
+Consignes :
+- Extrais toutes les formules mathématiques et physiques importantes
+- Organise-les par thème logique (Mécanique, Thermodynamique, Optique, etc.)
+- IMPORTANT : Réponds avec un **JSON valide strict**
+- Pour chaque formule, indique son nom, la formule en LaTeX (sans $$ $$), et les variables
+- N'utilise PAS de sauts de ligne réels à l'intérieur des textes. Utilise "\\n" pour les retours à la ligne.
+
+Format JSON attendu :
+[
+  {
+    "theme": "Mécanique",
+    "title": "Énergie cinétique",
+    "formula": "E_c = \\\\frac{1}{2}mv^2",
+    "description": "Énergie d'un corps en mouvement",
+    "variables": {
+      "E_c": "énergie cinétique (J)",
+      "m": "masse (kg)",
+      "v": "vitesse (m/s)"
+    }
+  }
+]
+
+Note : Le champ "description" et "variables" sont optionnels mais recommandés.`;
+
+    try {
+      const message = await this.callWithRetry(() => this.client!.messages.create({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 4096,
+        messages: [{ role: 'user', content: prompt }],
+      }));
+
+      const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+      const formulas = this.parseResponse<FormulaGenerationResult[]>(responseText);
+
+      if (!Array.isArray(formulas) || formulas.length === 0) {
+        throw new Error('Aucune formule extraite');
+      }
+
+      return formulas;
+    } catch (error) {
+      console.error('Error generating formulas:', error);
       throw new Error(`Échec de génération : ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     }
   }

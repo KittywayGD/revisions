@@ -89,6 +89,20 @@ class DatabaseService {
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS formulas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_id INTEGER NOT NULL,
+        chapter_id INTEGER,
+        theme TEXT NOT NULL,
+        title TEXT NOT NULL,
+        formula TEXT NOT NULL,
+        description TEXT,
+        variables TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE,
+        FOREIGN KEY (chapter_id) REFERENCES chapters (id) ON DELETE CASCADE
+      );
+
       CREATE INDEX IF NOT EXISTS idx_chapters_subject ON chapters(subject_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_chapter ON flashcards(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_next_review ON flashcards(next_review_date);
@@ -96,6 +110,9 @@ class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_review_history_flashcard ON review_history(flashcard_id);
       CREATE INDEX IF NOT EXISTS idx_events_subject ON events(subject_id);
       CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
+      CREATE INDEX IF NOT EXISTS idx_formulas_subject ON formulas(subject_id);
+      CREATE INDEX IF NOT EXISTS idx_formulas_chapter ON formulas(chapter_id);
+      CREATE INDEX IF NOT EXISTS idx_formulas_theme ON formulas(theme);
     `);
     this.runMigrations();
   }
@@ -426,6 +443,87 @@ class DatabaseService {
   deleteEvent(id) {
     this.db.prepare("DELETE FROM events WHERE id = ?").run(id);
   }
+  // Formulas
+  getFormulas() {
+    return this.db.prepare(
+      `
+      SELECT
+        f.*,
+        s.name as subject_name,
+        s.color as subject_color,
+        c.name as chapter_name
+      FROM formulas f
+      JOIN subjects s ON f.subject_id = s.id
+      LEFT JOIN chapters c ON f.chapter_id = c.id
+      ORDER BY s.name, f.theme, f.title
+    `
+    ).all();
+  }
+  getFormulasBySubject(subjectId) {
+    return this.db.prepare(
+      `
+      SELECT
+        f.*,
+        s.name as subject_name,
+        s.color as subject_color,
+        c.name as chapter_name
+      FROM formulas f
+      JOIN subjects s ON f.subject_id = s.id
+      LEFT JOIN chapters c ON f.chapter_id = c.id
+      WHERE f.subject_id = ?
+      ORDER BY f.theme, f.title
+    `
+    ).all(subjectId);
+  }
+  getFormulasByTheme(theme) {
+    return this.db.prepare(
+      `
+      SELECT
+        f.*,
+        s.name as subject_name,
+        s.color as subject_color,
+        c.name as chapter_name
+      FROM formulas f
+      JOIN subjects s ON f.subject_id = s.id
+      LEFT JOIN chapters c ON f.chapter_id = c.id
+      WHERE f.theme LIKE ?
+      ORDER BY s.name, f.title
+    `
+    ).all(`%${theme}%`);
+  }
+  searchFormulas(query) {
+    const searchPattern = `%${query}%`;
+    return this.db.prepare(
+      `
+      SELECT
+        f.*,
+        s.name as subject_name,
+        s.color as subject_color,
+        c.name as chapter_name
+      FROM formulas f
+      JOIN subjects s ON f.subject_id = s.id
+      LEFT JOIN chapters c ON f.chapter_id = c.id
+      WHERE f.title LIKE ? OR f.description LIKE ? OR f.formula LIKE ? OR f.theme LIKE ?
+      ORDER BY s.name, f.theme, f.title
+    `
+    ).all(searchPattern, searchPattern, searchPattern, searchPattern);
+  }
+  createFormula(subjectId, theme, title, formula, description, variables, chapterId) {
+    const result = this.db.prepare(
+      "INSERT INTO formulas (subject_id, chapter_id, theme, title, formula, description, variables) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(subjectId, chapterId || null, theme, title, formula, description || null, variables || null);
+    return this.db.prepare("SELECT * FROM formulas WHERE id = ?").get(result.lastInsertRowid);
+  }
+  updateFormula(id, theme, title, formula, description, variables) {
+    this.db.prepare("UPDATE formulas SET theme = ?, title = ?, formula = ?, description = ?, variables = ? WHERE id = ?").run(theme, title, formula, description || null, variables || null, id);
+  }
+  deleteFormula(id) {
+    this.db.prepare("DELETE FROM formulas WHERE id = ?").run(id);
+  }
+  getThemesBySubject(subjectId) {
+    const themes = this.db.prepare("SELECT DISTINCT theme FROM formulas WHERE subject_id = ? ORDER BY theme").all(subjectId);
+    return themes.map((t) => t.theme);
+  }
   close() {
     this.db.close();
   }
@@ -594,6 +692,53 @@ Note : Le champ "chart_data" est optionnel. Ne l'ajoute que si cela apporte une 
       return quizzes;
     } catch (error) {
       console.error("Error generating quizzes:", error);
+      throw new Error(`Échec de génération : ${error instanceof Error ? error.message : "Erreur inconnue"}`);
+    }
+  }
+  async generateFormulas(content, chapterTitle) {
+    this.ensureClient();
+    const prompt = `À partir du cours suivant sur "${chapterTitle}", extrais TOUTES les formules importantes au format JSON.
+
+Cours :
+${content}
+
+Consignes :
+- Extrais toutes les formules mathématiques et physiques importantes
+- Organise-les par thème logique (Mécanique, Thermodynamique, Optique, etc.)
+- IMPORTANT : Réponds avec un **JSON valide strict**
+- Pour chaque formule, indique son nom, la formule en LaTeX (sans $$ $$), et les variables
+- N'utilise PAS de sauts de ligne réels à l'intérieur des textes. Utilise "\\n" pour les retours à la ligne.
+
+Format JSON attendu :
+[
+  {
+    "theme": "Mécanique",
+    "title": "Énergie cinétique",
+    "formula": "E_c = \\\\frac{1}{2}mv^2",
+    "description": "Énergie d'un corps en mouvement",
+    "variables": {
+      "E_c": "énergie cinétique (J)",
+      "m": "masse (kg)",
+      "v": "vitesse (m/s)"
+    }
+  }
+]
+
+Note : Le champ "description" et "variables" sont optionnels mais recommandés.`;
+    try {
+      const message = await this.callWithRetry(() => this.client.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }]
+      }));
+      const responseText = message.content[0].type === "text" ? message.content[0].text : "";
+      const formulas = this.parseResponse(responseText);
+      if (!Array.isArray(formulas) || formulas.length === 0) {
+        throw new Error("Aucune formule extraite");
+      }
+      return formulas;
+    } catch (error) {
+      console.error("Error generating formulas:", error);
       throw new Error(`Échec de génération : ${error instanceof Error ? error.message : "Erreur inconnue"}`);
     }
   }
@@ -817,6 +962,30 @@ ipcMain.handle("db:updateEvent", async (_, id, title, eventType, eventDate, desc
 ipcMain.handle("db:deleteEvent", async (_, id) => {
   return dbService.deleteEvent(id);
 });
+ipcMain.handle("db:getFormulas", async () => {
+  return dbService.getFormulas();
+});
+ipcMain.handle("db:getFormulasBySubject", async (_, subjectId) => {
+  return dbService.getFormulasBySubject(subjectId);
+});
+ipcMain.handle("db:getFormulasByTheme", async (_, theme) => {
+  return dbService.getFormulasByTheme(theme);
+});
+ipcMain.handle("db:searchFormulas", async (_, query) => {
+  return dbService.searchFormulas(query);
+});
+ipcMain.handle("db:createFormula", async (_, subjectId, theme, title, formula, description, variables, chapterId) => {
+  return dbService.createFormula(subjectId, theme, title, formula, description, variables, chapterId);
+});
+ipcMain.handle("db:updateFormula", async (_, id, theme, title, formula, description, variables) => {
+  return dbService.updateFormula(id, theme, title, formula, description, variables);
+});
+ipcMain.handle("db:deleteFormula", async (_, id) => {
+  return dbService.deleteFormula(id);
+});
+ipcMain.handle("db:getThemesBySubject", async (_, subjectId) => {
+  return dbService.getThemesBySubject(subjectId);
+});
 ipcMain.handle("file:selectFile", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openFile"],
@@ -844,6 +1013,9 @@ ipcMain.handle("ai:generateFlashcards", async (_, content, count, chapterTitle) 
 });
 ipcMain.handle("ai:generateQuizzes", async (_, content, count, chapterTitle) => {
   return aiService.generateQuizzes(content, count, chapterTitle);
+});
+ipcMain.handle("ai:generateFormulas", async (_, content, chapterTitle) => {
+  return aiService.generateFormulas(content, chapterTitle);
 });
 ipcMain.handle("settings:getApiKey", async () => {
   const configPath = path.join(app.getPath("userData"), "config", "api-key.txt");

@@ -177,6 +177,39 @@ ipcMain.handle('db:deleteEvent', async (_, id: number) => {
   return dbService.deleteEvent(id);
 });
 
+// Formulas
+ipcMain.handle('db:getFormulas', async () => {
+  return dbService.getFormulas();
+});
+
+ipcMain.handle('db:getFormulasBySubject', async (_, subjectId: number) => {
+  return dbService.getFormulasBySubject(subjectId);
+});
+
+ipcMain.handle('db:getFormulasByTheme', async (_, theme: string) => {
+  return dbService.getFormulasByTheme(theme);
+});
+
+ipcMain.handle('db:searchFormulas', async (_, query: string) => {
+  return dbService.searchFormulas(query);
+});
+
+ipcMain.handle('db:createFormula', async (_, subjectId: number, theme: string, title: string, formula: string, description?: string, variables?: string, chapterId?: number) => {
+  return dbService.createFormula(subjectId, theme, title, formula, description, variables, chapterId);
+});
+
+ipcMain.handle('db:updateFormula', async (_, id: number, theme: string, title: string, formula: string, description?: string, variables?: string) => {
+  return dbService.updateFormula(id, theme, title, formula, description, variables);
+});
+
+ipcMain.handle('db:deleteFormula', async (_, id: number) => {
+  return dbService.deleteFormula(id);
+});
+
+ipcMain.handle('db:getThemesBySubject', async (_, subjectId: number) => {
+  return dbService.getThemesBySubject(subjectId);
+});
+
 // File operations
 ipcMain.handle('file:selectFile', async () => {
   const result = await dialog.showOpenDialog(mainWindow!, {
@@ -210,6 +243,10 @@ ipcMain.handle('ai:generateFlashcards', async (_, content: string, count: number
 
 ipcMain.handle('ai:generateQuizzes', async (_, content: string, count: number, chapterTitle: string) => {
   return aiService.generateQuizzes(content, count, chapterTitle);
+});
+
+ipcMain.handle('ai:generateFormulas', async (_, content: string, chapterTitle: string) => {
+  return aiService.generateFormulas(content, chapterTitle);
 });
 
 // Settings

@@ -26,6 +26,16 @@ export interface ElectronAPI {
   updateEvent: (id: number, title: string, eventType: string, eventDate: string, description?: string) => Promise<void>;
   deleteEvent: (id: number) => Promise<void>;
 
+  // Formulas
+  getFormulas: () => Promise<any[]>;
+  getFormulasBySubject: (subjectId: number) => Promise<any[]>;
+  getFormulasByTheme: (theme: string) => Promise<any[]>;
+  searchFormulas: (query: string) => Promise<any[]>;
+  createFormula: (subjectId: number, theme: string, title: string, formula: string, description?: string, variables?: string, chapterId?: number) => Promise<any>;
+  updateFormula: (id: number, theme: string, title: string, formula: string, description?: string, variables?: string) => Promise<void>;
+  deleteFormula: (id: number) => Promise<void>;
+  getThemesBySubject: (subjectId: number) => Promise<string[]>;
+
   // File operations
   selectFile: () => Promise<{
     path: string;
@@ -37,6 +47,7 @@ export interface ElectronAPI {
   // AI operations
   generateFlashcards: (content: string, count: number, chapterTitle: string) => Promise<any[]>;
   generateQuizzes: (content: string, count: number, chapterTitle: string) => Promise<any[]>;
+  generateFormulas: (content: string, chapterTitle: string) => Promise<any[]>;
 
   // Settings
   getApiKey: () => Promise<string | null>;

@@ -26,11 +26,21 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   createEvent: (subjectId, title, eventType, eventDate, description) => electron.ipcRenderer.invoke("db:createEvent", subjectId, title, eventType, eventDate, description),
   updateEvent: (id, title, eventType, eventDate, description) => electron.ipcRenderer.invoke("db:updateEvent", id, title, eventType, eventDate, description),
   deleteEvent: (id) => electron.ipcRenderer.invoke("db:deleteEvent", id),
+  // Formulas
+  getFormulas: () => electron.ipcRenderer.invoke("db:getFormulas"),
+  getFormulasBySubject: (subjectId) => electron.ipcRenderer.invoke("db:getFormulasBySubject", subjectId),
+  getFormulasByTheme: (theme) => electron.ipcRenderer.invoke("db:getFormulasByTheme", theme),
+  searchFormulas: (query) => electron.ipcRenderer.invoke("db:searchFormulas", query),
+  createFormula: (subjectId, theme, title, formula, description, variables, chapterId) => electron.ipcRenderer.invoke("db:createFormula", subjectId, theme, title, formula, description, variables, chapterId),
+  updateFormula: (id, theme, title, formula, description, variables) => electron.ipcRenderer.invoke("db:updateFormula", id, theme, title, formula, description, variables),
+  deleteFormula: (id) => electron.ipcRenderer.invoke("db:deleteFormula", id),
+  getThemesBySubject: (subjectId) => electron.ipcRenderer.invoke("db:getThemesBySubject", subjectId),
   // File operations
   selectFile: () => electron.ipcRenderer.invoke("file:selectFile"),
   // AI operations
   generateFlashcards: (content, count, chapterTitle) => electron.ipcRenderer.invoke("ai:generateFlashcards", content, count, chapterTitle),
   generateQuizzes: (content, count, chapterTitle) => electron.ipcRenderer.invoke("ai:generateQuizzes", content, count, chapterTitle),
+  generateFormulas: (content, chapterTitle) => electron.ipcRenderer.invoke("ai:generateFormulas", content, chapterTitle),
   // Settings
   getApiKey: () => electron.ipcRenderer.invoke("settings:getApiKey"),
   setApiKey: (apiKey) => electron.ipcRenderer.invoke("settings:setApiKey", apiKey),

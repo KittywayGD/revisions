@@ -7,7 +7,7 @@ export default function Generate() {
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
-  const [contentType, setContentType] = useState<'flashcards' | 'quizzes'>('flashcards');
+  const [contentType, setContentType] = useState<'flashcards' | 'quizzes' | 'formulas'>('flashcards');
   const [count, setCount] = useState(10);
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
@@ -39,7 +39,7 @@ export default function Generate() {
   };
 
   const handleGenerate = async () => {
-    if (!selectedChapter) return;
+    if (!selectedChapter || !selectedSubject) return;
 
     const chapter = chapters.find((c) => c.id === selectedChapter);
     if (!chapter) return;
@@ -63,7 +63,7 @@ export default function Generate() {
             difficulty: result.difficulty,
           });
         }
-      } else {
+      } else if (contentType === 'quizzes') {
         const results = await window.electronAPI.generateQuizzes(
           chapter.content,
           count,
@@ -81,6 +81,25 @@ export default function Generate() {
             correct_option: ['a', 'b', 'c', 'd'][result.correct],
             explanation: result.explanation,
           });
+        }
+      } else {
+        // Generate formulas
+        const results = await window.electronAPI.generateFormulas(
+          chapter.content,
+          chapter.name
+        );
+
+        for (const result of results) {
+          const variablesJson = result.variables ? JSON.stringify(result.variables) : undefined;
+          await window.electronAPI.createFormula(
+            selectedSubject,
+            result.theme,
+            result.title,
+            result.formula,
+            result.description,
+            variablesJson,
+            selectedChapter
+          );
         }
       }
 
@@ -151,7 +170,7 @@ export default function Generate() {
 
         <div>
           <label className="block text-sm font-medium mb-2">Type de contenu</label>
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-wrap">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
@@ -170,22 +189,33 @@ export default function Generate() {
               />
               <span>Quiz (QCM)</span>
             </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={contentType === 'formulas'}
+                onChange={() => setContentType('formulas')}
+                className="text-primary-600"
+              />
+              <span>Formules</span>
+            </label>
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Nombre d'éléments (recommandé: 5-15)
-          </label>
-          <input
-            type="number"
-            value={count}
-            onChange={(e) => setCount(Math.max(1, Math.min(30, Number(e.target.value))))}
-            min="1"
-            max="30"
-            className="input"
-          />
-        </div>
+        {contentType !== 'formulas' && (
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Nombre d'éléments (recommandé: 5-15)
+            </label>
+            <input
+              type="number"
+              value={count}
+              onChange={(e) => setCount(Math.max(1, Math.min(30, Number(e.target.value))))}
+              min="1"
+              max="30"
+              className="input"
+            />
+          </div>
+        )}
 
         {generated && (
           <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center gap-3 text-green-700 dark:text-green-400">
@@ -193,8 +223,9 @@ export default function Generate() {
             <div>
               <p className="font-medium">Génération réussie !</p>
               <p className="text-sm">
-                {count} {contentType === 'flashcards' ? 'flashcards' : 'quiz'} créé
-                {count > 1 ? 's' : ''}
+                {contentType === 'formulas'
+                  ? 'Formules extraites et ajoutées au formulaire'
+                  : `${count} ${contentType === 'flashcards' ? 'flashcards' : 'quiz'} créé${count > 1 ? 's' : ''}`}
               </p>
             </div>
           </div>

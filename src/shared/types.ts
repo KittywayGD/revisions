@@ -59,6 +59,18 @@ export interface Event {
   created_at: string;
 }
 
+export interface Formula {
+  id: number;
+  subject_id: number;
+  chapter_id?: number;
+  theme: string;
+  title: string;
+  formula: string;
+  description?: string;
+  variables?: string; // JSON string with variable descriptions
+  created_at: string;
+}
+
 // Extended types with relations
 export interface ChapterWithSubject extends Chapter {
   subject_name: string;
@@ -73,6 +85,12 @@ export interface FlashcardWithChapter extends Flashcard {
 export interface EventWithSubject extends Event {
   subject_name: string;
   subject_color: string;
+}
+
+export interface FormulaWithSubject extends Formula {
+  subject_name: string;
+  subject_color: string;
+  chapter_name?: string;
 }
 
 // API types
@@ -99,6 +117,14 @@ export interface QuizGenerationResult {
   options: [string, string, string, string];
   correct: number;
   explanation: string;
+}
+
+export interface FormulaGenerationResult {
+  theme: string;
+  title: string;
+  formula: string;
+  description?: string;
+  variables?: Record<string, string>;
 }
 
 // UI types
@@ -152,4 +178,4 @@ export interface ImportedFile {
 export type Theme = 'light' | 'dark';
 
 // Navigation
-export type NavigationPage = 'dashboard' | 'library' | 'generate' | 'review' | 'quiz' | 'statistics' | 'calendar';
+export type NavigationPage = 'dashboard' | 'library' | 'generate' | 'review' | 'quiz' | 'statistics' | 'calendar' | 'formulas';

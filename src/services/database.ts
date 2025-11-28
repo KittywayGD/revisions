@@ -1,7 +1,7 @@
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const Database = require('better-sqlite3');
-import type { Subject, Chapter, Flashcard, Quiz, ReviewHistory, Statistics, Event, EventWithSubject } from '../shared/types.js';
+import type { Subject, Chapter, Flashcard, Quiz, ReviewHistory, Statistics, Event, EventWithSubject, Formula, FormulaWithSubject } from '../shared/types.js';
 
 export class DatabaseService {
   private db: Database.Database;
@@ -82,6 +82,20 @@ export class DatabaseService {
         FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS formulas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_id INTEGER NOT NULL,
+        chapter_id INTEGER,
+        theme TEXT NOT NULL,
+        title TEXT NOT NULL,
+        formula TEXT NOT NULL,
+        description TEXT,
+        variables TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects (id) ON DELETE CASCADE,
+        FOREIGN KEY (chapter_id) REFERENCES chapters (id) ON DELETE CASCADE
+      );
+
       CREATE INDEX IF NOT EXISTS idx_chapters_subject ON chapters(subject_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_chapter ON flashcards(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_next_review ON flashcards(next_review_date);
@@ -89,6 +103,9 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_review_history_flashcard ON review_history(flashcard_id);
       CREATE INDEX IF NOT EXISTS idx_events_subject ON events(subject_id);
       CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date);
+      CREATE INDEX IF NOT EXISTS idx_formulas_subject ON formulas(subject_id);
+      CREATE INDEX IF NOT EXISTS idx_formulas_chapter ON formulas(chapter_id);
+      CREATE INDEX IF NOT EXISTS idx_formulas_theme ON formulas(theme);
     `);
     
     // Run migrations for existing databases
@@ -564,6 +581,124 @@ export class DatabaseService {
 
   deleteEvent(id: number): void {
     this.db.prepare('DELETE FROM events WHERE id = ?').run(id);
+  }
+
+  // Formulas
+  getFormulas(): FormulaWithSubject[] {
+    return this.db
+      .prepare(
+        `
+      SELECT
+        f.*,
+        s.name as subject_name,
+        s.color as subject_color,
+        c.name as chapter_name
+      FROM formulas f
+      JOIN subjects s ON f.subject_id = s.id
+      LEFT JOIN chapters c ON f.chapter_id = c.id
+      ORDER BY s.name, f.theme, f.title
+    `
+      )
+      .all() as FormulaWithSubject[];
+  }
+
+  getFormulasBySubject(subjectId: number): FormulaWithSubject[] {
+    return this.db
+      .prepare(
+        `
+      SELECT
+        f.*,
+        s.name as subject_name,
+        s.color as subject_color,
+        c.name as chapter_name
+      FROM formulas f
+      JOIN subjects s ON f.subject_id = s.id
+      LEFT JOIN chapters c ON f.chapter_id = c.id
+      WHERE f.subject_id = ?
+      ORDER BY f.theme, f.title
+    `
+      )
+      .all(subjectId) as FormulaWithSubject[];
+  }
+
+  getFormulasByTheme(theme: string): FormulaWithSubject[] {
+    return this.db
+      .prepare(
+        `
+      SELECT
+        f.*,
+        s.name as subject_name,
+        s.color as subject_color,
+        c.name as chapter_name
+      FROM formulas f
+      JOIN subjects s ON f.subject_id = s.id
+      LEFT JOIN chapters c ON f.chapter_id = c.id
+      WHERE f.theme LIKE ?
+      ORDER BY s.name, f.title
+    `
+      )
+      .all(`%${theme}%`) as FormulaWithSubject[];
+  }
+
+  searchFormulas(query: string): FormulaWithSubject[] {
+    const searchPattern = `%${query}%`;
+    return this.db
+      .prepare(
+        `
+      SELECT
+        f.*,
+        s.name as subject_name,
+        s.color as subject_color,
+        c.name as chapter_name
+      FROM formulas f
+      JOIN subjects s ON f.subject_id = s.id
+      LEFT JOIN chapters c ON f.chapter_id = c.id
+      WHERE f.title LIKE ? OR f.description LIKE ? OR f.formula LIKE ? OR f.theme LIKE ?
+      ORDER BY s.name, f.theme, f.title
+    `
+      )
+      .all(searchPattern, searchPattern, searchPattern, searchPattern) as FormulaWithSubject[];
+  }
+
+  createFormula(
+    subjectId: number,
+    theme: string,
+    title: string,
+    formula: string,
+    description?: string,
+    variables?: string,
+    chapterId?: number
+  ): Formula {
+    const result = this.db
+      .prepare(
+        'INSERT INTO formulas (subject_id, chapter_id, theme, title, formula, description, variables) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      )
+      .run(subjectId, chapterId || null, theme, title, formula, description || null, variables || null);
+    return this.db.prepare('SELECT * FROM formulas WHERE id = ?').get(result.lastInsertRowid) as Formula;
+  }
+
+  updateFormula(
+    id: number,
+    theme: string,
+    title: string,
+    formula: string,
+    description?: string,
+    variables?: string
+  ): void {
+    this.db
+      .prepare('UPDATE formulas SET theme = ?, title = ?, formula = ?, description = ?, variables = ? WHERE id = ?')
+      .run(theme, title, formula, description || null, variables || null, id);
+  }
+
+  deleteFormula(id: number): void {
+    this.db.prepare('DELETE FROM formulas WHERE id = ?').run(id);
+  }
+
+  getThemesBySubject(subjectId: number): string[] {
+    const themes = this.db
+      .prepare('SELECT DISTINCT theme FROM formulas WHERE subject_id = ? ORDER BY theme')
+      .all(subjectId) as { theme: string }[];
+    return themes.map((t) => t.theme);
   }
 
   close() {
