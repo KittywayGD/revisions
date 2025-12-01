@@ -14,6 +14,7 @@ Application desktop intelligente de révision pour les cours de PSI (Physique et
 ### 🤖 Génération par IA (Claude Haiku 4.5)
 - **Flashcards** intelligentes avec questions/réponses
 - **Quiz QCM** avec 4 options et explications
+- **📝 Exercices d'application** avec énoncés complets et solutions détaillées étape par étape
 - **📐 Extraction automatique de formules** depuis vos cours
 - **Support LaTeX** : Formules mathématiques rendues avec KaTeX
 - **Support graphiques** : Courbes et diagrammes avec Recharts
@@ -23,6 +24,14 @@ Application desktop intelligente de révision pour les cours de PSI (Physique et
 - **Priorisation automatique** selon vos événements (tests, khôlles, examens)
 - Notation facile/moyen/difficile
 - Suivi de progression personnalisé
+
+### 📝 Exercices pratiques
+- **Vrais exercices d'application** générés par IA
+- Énoncés complets avec données numériques
+- **Solutions détaillées étape par étape** (masquées par défaut)
+- Système de statut : À faire, En cours, Terminé, À revoir
+- Support LaTeX pour formules mathématiques
+- Organisation par matière et difficulté
 
 ### 📐 Formulaire interactif
 - **Base de données searchable** de toutes vos formules
@@ -125,6 +134,7 @@ Les fichiers de distribution seront dans `release/`.
 3. Choisissez le type :
    - **Flashcards** : Questions/réponses pour mémorisation
    - **Quiz** : QCM avec explications
+   - **Exercices** : Problèmes d'application avec solutions détaillées
    - **Formules** : Extraction automatique des formules importantes
 4. Cliquez sur **Générer**
 
@@ -156,6 +166,17 @@ Les fichiers de distribution seront dans `release/`.
 2. Utilisez la **recherche** instantanée
 3. Filtrez par matière ou thème
 4. Cliquez sur une formule pour voir les détails et variables
+
+### 6️⃣ Faire des exercices
+
+1. Allez dans **Exercices**
+2. Filtrez par statut (À faire, En cours, Terminé, À revoir)
+3. Cliquez sur un exercice pour voir l'énoncé complet
+4. Travaillez sur l'exercice (sur papier ou mentalement)
+5. Cliquez sur **"Voir la solution"** pour révéler la correction étape par étape
+6. Changez le statut selon votre progression
+
+💡 **Astuce** : Essayez de résoudre complètement l'exercice avant de regarder la solution !
 
 ## 🎯 Fonctionnalités avancées
 
@@ -201,6 +222,7 @@ psi-revision-app/
 │   │   │   ├── Generate.tsx     # Génération IA
 │   │   │   ├── Review.tsx       # Mode révision
 │   │   │   ├── QuizPage.tsx     # Mode quiz
+│   │   │   ├── Exercises.tsx    # Exercices avec solutions
 │   │   │   ├── Formulas.tsx     # Formulaire interactif
 │   │   │   ├── Calendar.tsx     # Gestion événements
 │   │   │   ├── Statistics.tsx   # Statistiques
@@ -224,6 +246,7 @@ subjects       → Matières (nom, couleur)
 chapters       → Chapitres (contenu, fichier source)
 flashcards     → Flashcards (question, réponse, SM-2 data, chart_data)
 quizzes        → Quiz (question, 4 options, explication, chart_data)
+exercises      → Exercices (titre, énoncé, solution, difficulté, statut)
 formulas       → Formules (titre, formule LaTeX, thème, variables)
 events         → Événements (type, date, description)
 review_history → Historique des révisions
@@ -239,8 +262,9 @@ review_history → Historique des révisions
 
 **Exemples** :
 - Cours de 5000 mots + 10 flashcards : **~$0.003**
+- 5 exercices avec solutions détaillées : **~$0.008**
 - Extraction formules d'un chapitre : **~$0.002**
-- 100 générations/mois : **~$0.30**
+- 100 générations/mois : **~$0.30-0.50**
 
 💡 Très économique pour un usage étudiant !
 
@@ -285,15 +309,18 @@ rm ~/Library/Application\ Support/psi-revision-app/database/psi-revision.db
 3. Générer :
    - 15 flashcards
    - 10 quiz
+   - 5 exercices d'application
    - Formules (extraction auto)
 
 **Mardi-Jeudi** :
 - Mode **Révision** : L'app priorise automatiquement la Physique
+- **Exercices** : Faire les 5 exercices (sur papier, puis vérifier les solutions)
 - Consultation du **Formulaire** pour les formules clés
 - Quiz pour tester la compréhension
 
 **Vendredi** :
 - Dernière session de révision (boost ×3 de priorité)
+- Refaire les exercices marqués "À revoir"
 - Consultation rapide des formules
 - ✅ Prêt pour le test !
 
