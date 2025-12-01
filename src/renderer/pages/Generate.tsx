@@ -7,7 +7,7 @@ export default function Generate() {
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
-  const [contentType, setContentType] = useState<'flashcards' | 'quizzes' | 'formulas'>('flashcards');
+  const [contentType, setContentType] = useState<'flashcards' | 'quizzes' | 'formulas' | 'exercises'>('flashcards');
   const [count, setCount] = useState(10);
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
@@ -82,7 +82,7 @@ export default function Generate() {
             explanation: result.explanation,
           });
         }
-      } else {
+      } else if (contentType === 'formulas') {
         // Generate formulas
         const results = await window.electronAPI.generateFormulas(
           chapter.content,
@@ -99,6 +99,23 @@ export default function Generate() {
             result.description,
             variablesJson,
             selectedChapter
+          );
+        }
+      } else {
+        // Generate exercises
+        const results = await window.electronAPI.generateExercises(
+          chapter.content,
+          count,
+          chapter.name
+        );
+
+        for (const result of results) {
+          await window.electronAPI.createExercise(
+            selectedChapter,
+            result.title,
+            result.statement,
+            result.solution,
+            result.difficulty
           );
         }
       }
@@ -198,6 +215,15 @@ export default function Generate() {
               />
               <span>Formules</span>
             </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={contentType === 'exercises'}
+                onChange={() => setContentType('exercises')}
+                className="text-primary-600"
+              />
+              <span>Exercices</span>
+            </label>
           </div>
         </div>
 
@@ -225,6 +251,8 @@ export default function Generate() {
               <p className="text-sm">
                 {contentType === 'formulas'
                   ? 'Formules extraites et ajoutées au formulaire'
+                  : contentType === 'exercises'
+                  ? `${count} exercice${count > 1 ? 's' : ''} généré${count > 1 ? 's' : ''}`
                   : `${count} ${contentType === 'flashcards' ? 'flashcards' : 'quiz'} créé${count > 1 ? 's' : ''}`}
               </p>
             </div>
@@ -254,6 +282,11 @@ export default function Generate() {
             💡 Astuce: La génération utilise Claude Haiku 4.5 pour créer du contenu adapté au
             niveau PSI.
           </p>
+          {contentType === 'exercises' && (
+            <p className="mt-2 text-blue-600 dark:text-blue-400">
+              ⚡ Les exercices incluent des énoncés complets avec des solutions détaillées étape par étape.
+            </p>
+          )}
           <p className="mt-2">
             Assurez-vous d'avoir configuré votre clé API Anthropic dans les paramètres.
           </p>

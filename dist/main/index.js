@@ -103,6 +103,18 @@ class DatabaseService {
         FOREIGN KEY (chapter_id) REFERENCES chapters (id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS exercises (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chapter_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        statement TEXT NOT NULL,
+        solution TEXT NOT NULL,
+        difficulty TEXT NOT NULL CHECK(difficulty IN ('easy', 'medium', 'hard')),
+        status TEXT DEFAULT 'not_started' CHECK(status IN ('not_started', 'in_progress', 'completed', 'to_review')),
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (chapter_id) REFERENCES chapters (id) ON DELETE CASCADE
+      );
+
       CREATE INDEX IF NOT EXISTS idx_chapters_subject ON chapters(subject_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_chapter ON flashcards(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_next_review ON flashcards(next_review_date);
@@ -113,6 +125,8 @@ class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_formulas_subject ON formulas(subject_id);
       CREATE INDEX IF NOT EXISTS idx_formulas_chapter ON formulas(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_formulas_theme ON formulas(theme);
+      CREATE INDEX IF NOT EXISTS idx_exercises_chapter ON exercises(chapter_id);
+      CREATE INDEX IF NOT EXISTS idx_exercises_status ON exercises(status);
     `);
     this.runMigrations();
   }
@@ -524,6 +538,55 @@ class DatabaseService {
     const themes = this.db.prepare("SELECT DISTINCT theme FROM formulas WHERE subject_id = ? ORDER BY theme").all(subjectId);
     return themes.map((t) => t.theme);
   }
+  // Exercises
+  getExercisesByChapter(chapterId) {
+    return this.db.prepare("SELECT * FROM exercises WHERE chapter_id = ? ORDER BY created_at DESC").all(chapterId);
+  }
+  getAllExercises() {
+    return this.db.prepare(
+      `
+      SELECT
+        e.*,
+        c.name as chapter_name,
+        s.name as subject_name,
+        s.id as subject_id,
+        s.color as subject_color
+      FROM exercises e
+      JOIN chapters c ON e.chapter_id = c.id
+      JOIN subjects s ON c.subject_id = s.id
+      ORDER BY e.created_at DESC
+    `
+    ).all();
+  }
+  getExercisesByStatus(status) {
+    return this.db.prepare(
+      `
+      SELECT
+        e.*,
+        c.name as chapter_name,
+        s.name as subject_name,
+        s.id as subject_id,
+        s.color as subject_color
+      FROM exercises e
+      JOIN chapters c ON e.chapter_id = c.id
+      JOIN subjects s ON c.subject_id = s.id
+      WHERE e.status = ?
+      ORDER BY e.created_at DESC
+    `
+    ).all(status);
+  }
+  createExercise(chapterId, title, statement, solution, difficulty) {
+    const result = this.db.prepare(
+      "INSERT INTO exercises (chapter_id, title, statement, solution, difficulty) VALUES (?, ?, ?, ?, ?)"
+    ).run(chapterId, title, statement, solution, difficulty);
+    return this.db.prepare("SELECT * FROM exercises WHERE id = ?").get(result.lastInsertRowid);
+  }
+  updateExerciseStatus(id, status) {
+    this.db.prepare("UPDATE exercises SET status = ? WHERE id = ?").run(status, id);
+  }
+  deleteExercise(id) {
+    this.db.prepare("DELETE FROM exercises WHERE id = ?").run(id);
+  }
   close() {
     this.db.close();
   }
@@ -739,6 +802,68 @@ Note : Le champ "description" et "variables" sont optionnels mais recommandés.`
       return formulas;
     } catch (error) {
       console.error("Error generating formulas:", error);
+      throw new Error(`Échec de génération : ${error instanceof Error ? error.message : "Erreur inconnue"}`);
+    }
+  }
+  async generateExercises(content, count, chapterTitle) {
+    this.ensureClient();
+    const prompt = `Tu es un générateur d'exercices pour des étudiants de PSI (Physique et Sciences de l'Ingénieur).
+
+À partir du cours suivant sur "${chapterTitle}", génère EXACTEMENT ${count} exercices d'application.
+
+Cours :
+${content.substring(0, 3e3)}
+
+RÈGLES STRICTES :
+1. Réponds UNIQUEMENT avec un tableau JSON, rien d'autre
+2. N'ajoute AUCUN texte avant ou après le JSON
+3. Commence directement par [ et termine par ]
+4. Pas de markdown, pas de \`\`\`json
+5. Utilise "\\n" pour les retours à la ligne (pas de vrais sauts de ligne)
+6. Chaque exercice doit avoir : title, statement, solution, difficulty
+
+Format attendu :
+[
+  {
+    "title": "Titre court",
+    "statement": "Énoncé avec données numériques.\\n\\nQuestions à résoudre.",
+    "solution": "**Étape 1 :**\\nExplication...\\n\\n**Étape 2 :**\\nCalculs avec $formules$",
+    "difficulty": "easy"
+  }
+]
+
+COMMENCE MAINTENANT LE TABLEAU JSON :`;
+    try {
+      const message = await this.callWithRetry(() => this.client.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 4096,
+        // Limite max pour Haiku
+        messages: [{ role: "user", content: prompt }]
+      }));
+      const responseText = message.content[0].type === "text" ? message.content[0].text : "";
+      console.log("📝 Réponse brute de l'IA (exercices) :", responseText.substring(0, 500));
+      let exercises;
+      try {
+        exercises = this.parseResponse(responseText);
+      } catch (parseError) {
+        console.error("❌ Erreur de parsing JSON:", parseError);
+        console.error("📄 Texte complet:", responseText);
+        throw new Error(`Le format de réponse de l'IA est invalide. Réessayez la génération.`);
+      }
+      if (!Array.isArray(exercises) || exercises.length === 0) {
+        console.error("⚠️ Aucun exercice dans la réponse:", exercises);
+        throw new Error("Aucun exercice généré");
+      }
+      for (const exercise of exercises) {
+        if (!exercise.title || !exercise.statement || !exercise.solution) {
+          console.error("❌ Exercice invalide:", exercise);
+          throw new Error("Format d'exercice invalide (manque title, statement ou solution)");
+        }
+      }
+      console.log(`✅ ${exercises.length} exercice(s) généré(s) avec succès`);
+      return exercises;
+    } catch (error) {
+      console.error("Error generating exercises:", error);
       throw new Error(`Échec de génération : ${error instanceof Error ? error.message : "Erreur inconnue"}`);
     }
   }
@@ -1008,6 +1133,24 @@ ipcMain.handle("file:selectFile", async () => {
   }
   return null;
 });
+ipcMain.handle("db:getExercisesByChapter", async (_, chapterId) => {
+  return dbService.getExercisesByChapter(chapterId);
+});
+ipcMain.handle("db:getAllExercises", async () => {
+  return dbService.getAllExercises();
+});
+ipcMain.handle("db:getExercisesByStatus", async (_, status) => {
+  return dbService.getExercisesByStatus(status);
+});
+ipcMain.handle("db:createExercise", async (_, chapterId, title, statement, solution, difficulty) => {
+  return dbService.createExercise(chapterId, title, statement, solution, difficulty);
+});
+ipcMain.handle("db:updateExerciseStatus", async (_, id, status) => {
+  return dbService.updateExerciseStatus(id, status);
+});
+ipcMain.handle("db:deleteExercise", async (_, id) => {
+  return dbService.deleteExercise(id);
+});
 ipcMain.handle("ai:generateFlashcards", async (_, content, count, chapterTitle) => {
   return aiService.generateFlashcards(content, count, chapterTitle);
 });
@@ -1016,6 +1159,9 @@ ipcMain.handle("ai:generateQuizzes", async (_, content, count, chapterTitle) => 
 });
 ipcMain.handle("ai:generateFormulas", async (_, content, chapterTitle) => {
   return aiService.generateFormulas(content, chapterTitle);
+});
+ipcMain.handle("ai:generateExercises", async (_, content, count, chapterTitle) => {
+  return aiService.generateExercises(content, count, chapterTitle);
 });
 ipcMain.handle("settings:getApiKey", async () => {
   const configPath = path.join(app.getPath("userData"), "config", "api-key.txt");

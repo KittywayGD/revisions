@@ -7,6 +7,7 @@ import {
   ChartBarIcon,
   CalendarIcon,
   CalculatorIcon,
+  ClipboardDocumentListIcon,
   Cog6ToothIcon,
   SunIcon,
   MoonIcon
@@ -27,6 +28,7 @@ export default function Sidebar({ currentPage, onNavigate, theme, onToggleTheme 
     { id: 'generate' as const, label: 'Générer contenu', icon: SparklesIcon },
     { id: 'review' as const, label: 'Révision', icon: AcademicCapIcon },
     { id: 'quiz' as const, label: 'Quiz', icon: PuzzlePieceIcon },
+    { id: 'exercises' as const, label: 'Exercices', icon: ClipboardDocumentListIcon },
     { id: 'formulas' as const, label: 'Formulaire', icon: CalculatorIcon },
     { id: 'calendar' as const, label: 'Calendrier', icon: CalendarIcon },
     { id: 'statistics' as const, label: 'Statistiques', icon: ChartBarIcon },

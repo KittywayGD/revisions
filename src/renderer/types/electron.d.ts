@@ -44,10 +44,19 @@ export interface ElectronAPI {
     type: string;
   } | null>;
 
+  // Exercises
+  getExercisesByChapter: (chapterId: number) => Promise<any[]>;
+  getAllExercises: () => Promise<any[]>;
+  getExercisesByStatus: (status: string) => Promise<any[]>;
+  createExercise: (chapterId: number, title: string, statement: string, solution: string, difficulty: string) => Promise<any>;
+  updateExerciseStatus: (id: number, status: string) => Promise<void>;
+  deleteExercise: (id: number) => Promise<void>;
+
   // AI operations
   generateFlashcards: (content: string, count: number, chapterTitle: string) => Promise<any[]>;
   generateQuizzes: (content: string, count: number, chapterTitle: string) => Promise<any[]>;
   generateFormulas: (content: string, chapterTitle: string) => Promise<any[]>;
+  generateExercises: (content: string, count: number, chapterTitle: string) => Promise<any[]>;
 
   // Settings
   getApiKey: () => Promise<string | null>;

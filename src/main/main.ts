@@ -236,6 +236,31 @@ ipcMain.handle('file:selectFile', async () => {
   return null;
 });
 
+// Exercises
+ipcMain.handle('db:getExercisesByChapter', async (_, chapterId: number) => {
+  return dbService.getExercisesByChapter(chapterId);
+});
+
+ipcMain.handle('db:getAllExercises', async () => {
+  return dbService.getAllExercises();
+});
+
+ipcMain.handle('db:getExercisesByStatus', async (_, status: string) => {
+  return dbService.getExercisesByStatus(status);
+});
+
+ipcMain.handle('db:createExercise', async (_, chapterId: number, title: string, statement: string, solution: string, difficulty: string) => {
+  return dbService.createExercise(chapterId, title, statement, solution, difficulty);
+});
+
+ipcMain.handle('db:updateExerciseStatus', async (_, id: number, status: string) => {
+  return dbService.updateExerciseStatus(id, status);
+});
+
+ipcMain.handle('db:deleteExercise', async (_, id: number) => {
+  return dbService.deleteExercise(id);
+});
+
 // AI operations
 ipcMain.handle('ai:generateFlashcards', async (_, content: string, count: number, chapterTitle: string) => {
   return aiService.generateFlashcards(content, count, chapterTitle);
@@ -247,6 +272,10 @@ ipcMain.handle('ai:generateQuizzes', async (_, content: string, count: number, c
 
 ipcMain.handle('ai:generateFormulas', async (_, content: string, chapterTitle: string) => {
   return aiService.generateFormulas(content, chapterTitle);
+});
+
+ipcMain.handle('ai:generateExercises', async (_, content: string, count: number, chapterTitle: string) => {
+  return aiService.generateExercises(content, count, chapterTitle);
 });
 
 // Settings

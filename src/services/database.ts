@@ -96,6 +96,18 @@ export class DatabaseService {
         FOREIGN KEY (chapter_id) REFERENCES chapters (id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS exercises (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        chapter_id INTEGER NOT NULL,
+        title TEXT NOT NULL,
+        statement TEXT NOT NULL,
+        solution TEXT NOT NULL,
+        difficulty TEXT NOT NULL CHECK(difficulty IN ('easy', 'medium', 'hard')),
+        status TEXT DEFAULT 'not_started' CHECK(status IN ('not_started', 'in_progress', 'completed', 'to_review')),
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (chapter_id) REFERENCES chapters (id) ON DELETE CASCADE
+      );
+
       CREATE INDEX IF NOT EXISTS idx_chapters_subject ON chapters(subject_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_chapter ON flashcards(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_flashcards_next_review ON flashcards(next_review_date);
@@ -106,6 +118,8 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_formulas_subject ON formulas(subject_id);
       CREATE INDEX IF NOT EXISTS idx_formulas_chapter ON formulas(chapter_id);
       CREATE INDEX IF NOT EXISTS idx_formulas_theme ON formulas(theme);
+      CREATE INDEX IF NOT EXISTS idx_exercises_chapter ON exercises(chapter_id);
+      CREATE INDEX IF NOT EXISTS idx_exercises_status ON exercises(status);
     `);
     
     // Run migrations for existing databases
@@ -699,6 +713,75 @@ export class DatabaseService {
       .prepare('SELECT DISTINCT theme FROM formulas WHERE subject_id = ? ORDER BY theme')
       .all(subjectId) as { theme: string }[];
     return themes.map((t) => t.theme);
+  }
+
+  // Exercises
+  getExercisesByChapter(chapterId: number): any[] {
+    return this.db
+      .prepare('SELECT * FROM exercises WHERE chapter_id = ? ORDER BY created_at DESC')
+      .all(chapterId);
+  }
+
+  getAllExercises(): any[] {
+    return this.db
+      .prepare(
+        `
+      SELECT
+        e.*,
+        c.name as chapter_name,
+        s.name as subject_name,
+        s.id as subject_id,
+        s.color as subject_color
+      FROM exercises e
+      JOIN chapters c ON e.chapter_id = c.id
+      JOIN subjects s ON c.subject_id = s.id
+      ORDER BY e.created_at DESC
+    `
+      )
+      .all();
+  }
+
+  getExercisesByStatus(status: string): any[] {
+    return this.db
+      .prepare(
+        `
+      SELECT
+        e.*,
+        c.name as chapter_name,
+        s.name as subject_name,
+        s.id as subject_id,
+        s.color as subject_color
+      FROM exercises e
+      JOIN chapters c ON e.chapter_id = c.id
+      JOIN subjects s ON c.subject_id = s.id
+      WHERE e.status = ?
+      ORDER BY e.created_at DESC
+    `
+      )
+      .all(status);
+  }
+
+  createExercise(
+    chapterId: number,
+    title: string,
+    statement: string,
+    solution: string,
+    difficulty: string
+  ): any {
+    const result = this.db
+      .prepare(
+        'INSERT INTO exercises (chapter_id, title, statement, solution, difficulty) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(chapterId, title, statement, solution, difficulty);
+    return this.db.prepare('SELECT * FROM exercises WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  updateExerciseStatus(id: number, status: string): void {
+    this.db.prepare('UPDATE exercises SET status = ? WHERE id = ?').run(status, id);
+  }
+
+  deleteExercise(id: number): void {
+    this.db.prepare('DELETE FROM exercises WHERE id = ?').run(id);
   }
 
   close() {

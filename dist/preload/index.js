@@ -37,10 +37,18 @@ electron.contextBridge.exposeInMainWorld("electronAPI", {
   getThemesBySubject: (subjectId) => electron.ipcRenderer.invoke("db:getThemesBySubject", subjectId),
   // File operations
   selectFile: () => electron.ipcRenderer.invoke("file:selectFile"),
+  // Exercises
+  getExercisesByChapter: (chapterId) => electron.ipcRenderer.invoke("db:getExercisesByChapter", chapterId),
+  getAllExercises: () => electron.ipcRenderer.invoke("db:getAllExercises"),
+  getExercisesByStatus: (status) => electron.ipcRenderer.invoke("db:getExercisesByStatus", status),
+  createExercise: (chapterId, title, statement, solution, difficulty) => electron.ipcRenderer.invoke("db:createExercise", chapterId, title, statement, solution, difficulty),
+  updateExerciseStatus: (id, status) => electron.ipcRenderer.invoke("db:updateExerciseStatus", id, status),
+  deleteExercise: (id) => electron.ipcRenderer.invoke("db:deleteExercise", id),
   // AI operations
   generateFlashcards: (content, count, chapterTitle) => electron.ipcRenderer.invoke("ai:generateFlashcards", content, count, chapterTitle),
   generateQuizzes: (content, count, chapterTitle) => electron.ipcRenderer.invoke("ai:generateQuizzes", content, count, chapterTitle),
   generateFormulas: (content, chapterTitle) => electron.ipcRenderer.invoke("ai:generateFormulas", content, chapterTitle),
+  generateExercises: (content, count, chapterTitle) => electron.ipcRenderer.invoke("ai:generateExercises", content, count, chapterTitle),
   // Settings
   getApiKey: () => electron.ipcRenderer.invoke("settings:getApiKey"),
   setApiKey: (apiKey) => electron.ipcRenderer.invoke("settings:setApiKey", apiKey),

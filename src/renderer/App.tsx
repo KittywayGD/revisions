@@ -5,6 +5,7 @@ import Library from './pages/Library';
 import Generate from './pages/Generate';
 import Review from './pages/Review';
 import QuizPage from './pages/QuizPage';
+import Exercises from './pages/Exercises';
 import Formulas from './pages/Formulas';
 import Calendar from './pages/Calendar';
 import Statistics from './pages/Statistics';
@@ -43,6 +44,8 @@ function App() {
         return <Review />;
       case 'quiz':
         return <QuizPage />;
+      case 'exercises':
+        return <Exercises />;
       case 'formulas':
         return <Formulas />;
       case 'calendar':

@@ -71,6 +71,17 @@ export interface Formula {
   created_at: string;
 }
 
+export interface Exercise {
+  id: number;
+  chapter_id: number;
+  title: string;
+  statement: string;
+  solution: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  status: 'not_started' | 'in_progress' | 'completed' | 'to_review';
+  created_at: string;
+}
+
 // Extended types with relations
 export interface ChapterWithSubject extends Chapter {
   subject_name: string;
@@ -91,6 +102,13 @@ export interface FormulaWithSubject extends Formula {
   subject_name: string;
   subject_color: string;
   chapter_name?: string;
+}
+
+export interface ExerciseWithSubject extends Exercise {
+  chapter_name: string;
+  subject_name: string;
+  subject_id: number;
+  subject_color: string;
 }
 
 // API types
@@ -125,6 +143,13 @@ export interface FormulaGenerationResult {
   formula: string;
   description?: string;
   variables?: Record<string, string>;
+}
+
+export interface ExerciseGenerationResult {
+  title: string;
+  statement: string;
+  solution: string;
+  difficulty: 'easy' | 'medium' | 'hard';
 }
 
 // UI types
@@ -178,4 +203,4 @@ export interface ImportedFile {
 export type Theme = 'light' | 'dark';
 
 // Navigation
-export type NavigationPage = 'dashboard' | 'library' | 'generate' | 'review' | 'quiz' | 'statistics' | 'calendar' | 'formulas';
+export type NavigationPage = 'dashboard' | 'library' | 'generate' | 'review' | 'quiz' | 'statistics' | 'calendar' | 'formulas' | 'exercises';

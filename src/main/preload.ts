@@ -49,6 +49,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File operations
   selectFile: () => ipcRenderer.invoke('file:selectFile'),
 
+  // Exercises
+  getExercisesByChapter: (chapterId: number) => ipcRenderer.invoke('db:getExercisesByChapter', chapterId),
+  getAllExercises: () => ipcRenderer.invoke('db:getAllExercises'),
+  getExercisesByStatus: (status: string) => ipcRenderer.invoke('db:getExercisesByStatus', status),
+  createExercise: (chapterId: number, title: string, statement: string, solution: string, difficulty: string) =>
+    ipcRenderer.invoke('db:createExercise', chapterId, title, statement, solution, difficulty),
+  updateExerciseStatus: (id: number, status: string) => ipcRenderer.invoke('db:updateExerciseStatus', id, status),
+  deleteExercise: (id: number) => ipcRenderer.invoke('db:deleteExercise', id),
+
   // AI operations
   generateFlashcards: (content: string, count: number, chapterTitle: string) =>
     ipcRenderer.invoke('ai:generateFlashcards', content, count, chapterTitle),
@@ -56,6 +65,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ai:generateQuizzes', content, count, chapterTitle),
   generateFormulas: (content: string, chapterTitle: string) =>
     ipcRenderer.invoke('ai:generateFormulas', content, chapterTitle),
+  generateExercises: (content: string, count: number, chapterTitle: string) =>
+    ipcRenderer.invoke('ai:generateExercises', content, count, chapterTitle),
 
   // Settings
   getApiKey: () => ipcRenderer.invoke('settings:getApiKey'),

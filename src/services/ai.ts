@@ -262,4 +262,76 @@ Note : Le champ "description" et "variables" sont optionnels mais recommandés.`
       throw new Error(`Échec de génération : ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     }
   }
+
+  async generateExercises(content: string, count: number, chapterTitle: string): Promise<any[]> {
+    this.ensureClient();
+
+    const prompt = `Tu es un générateur d'exercices pour des étudiants de PSI (Physique et Sciences de l'Ingénieur).
+
+À partir du cours suivant sur "${chapterTitle}", génère EXACTEMENT ${count} exercices d'application.
+
+Cours :
+${content.substring(0, 3000)}
+
+RÈGLES STRICTES :
+1. Réponds UNIQUEMENT avec un tableau JSON, rien d'autre
+2. N'ajoute AUCUN texte avant ou après le JSON
+3. Commence directement par [ et termine par ]
+4. Pas de markdown, pas de \`\`\`json
+5. Utilise "\\n" pour les retours à la ligne (pas de vrais sauts de ligne)
+6. Chaque exercice doit avoir : title, statement, solution, difficulty
+
+Format attendu :
+[
+  {
+    "title": "Titre court",
+    "statement": "Énoncé avec données numériques.\\n\\nQuestions à résoudre.",
+    "solution": "**Étape 1 :**\\nExplication...\\n\\n**Étape 2 :**\\nCalculs avec $formules$",
+    "difficulty": "easy"
+  }
+]
+
+COMMENCE MAINTENANT LE TABLEAU JSON :`;
+
+    try {
+      const message = await this.callWithRetry(() => this.client!.messages.create({
+        model: 'claude-3-haiku-20240307',
+        max_tokens: 4096, // Limite max pour Haiku
+        messages: [{ role: 'user', content: prompt }],
+      }));
+
+      const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+
+      console.log('📝 Réponse brute de l\'IA (exercices) :', responseText.substring(0, 500));
+
+      // Parsing plus robuste
+      let exercises: any[];
+      try {
+        exercises = this.parseResponse<any[]>(responseText);
+      } catch (parseError) {
+        console.error('❌ Erreur de parsing JSON:', parseError);
+        console.error('📄 Texte complet:', responseText);
+        throw new Error(`Le format de réponse de l'IA est invalide. Réessayez la génération.`);
+      }
+
+      if (!Array.isArray(exercises) || exercises.length === 0) {
+        console.error('⚠️ Aucun exercice dans la réponse:', exercises);
+        throw new Error('Aucun exercice généré');
+      }
+
+      // Validation basique
+      for (const exercise of exercises) {
+        if (!exercise.title || !exercise.statement || !exercise.solution) {
+          console.error('❌ Exercice invalide:', exercise);
+          throw new Error('Format d\'exercice invalide (manque title, statement ou solution)');
+        }
+      }
+
+      console.log(`✅ ${exercises.length} exercice(s) généré(s) avec succès`);
+      return exercises;
+    } catch (error) {
+      console.error('Error generating exercises:', error);
+      throw new Error(`Échec de génération : ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    }
+  }
 }
